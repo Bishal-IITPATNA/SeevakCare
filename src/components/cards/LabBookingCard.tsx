@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { RazorpayButton } from "@/components/RazorpayButton";
+import { PaymentOptions } from "@/components/PaymentOptions";
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING:          "badge-pending",
@@ -71,10 +71,10 @@ export function LabBookingCard({ booking, onUpdate }: { booking: any; onUpdate?:
       )}
 
       {verified && booking.status === "PENDING" && !booking.payment && (
-        <RazorpayButton
+        <PaymentOptions
           type="LAB_BOOKING"
           referenceId={booking.id}
-          label="Pay & Confirm"
+          amount={Number(booking.labTest?.price ?? 0)}
           onSuccess={onUpdate}
         />
       )}

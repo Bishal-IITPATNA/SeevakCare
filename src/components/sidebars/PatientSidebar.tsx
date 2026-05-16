@@ -3,10 +3,13 @@ const NAV = [
   { id: "appointments",  label: "Appointments",    icon: "📅" },
   { id: "prescriptions", label: "Prescriptions",   icon: "📋" },
   { id: "medicines",     label: "Order Medicines",  icon: "💊" },
+  { id: "orders",        label: "My Orders",        icon: "📦" },
+  { id: "prescriptions-upload", label: "My Prescriptions", icon: "📄" },
   { id: "lab",           label: "Lab Tests",        icon: "🧪" },
   { id: "book-doctor",   label: "Find a Doctor",    icon: "👨‍⚕️" },
-  { id: "hospitals",     label: "Hospitals",        icon: "🏥" },
-  { id: "profile",       label: "My Profile",       icon: "👤" },
+  { id: "hospitals",     label: "Hospitals",        icon: "🏢" },
+  { id: "emi",           label: "My EMI Plans",     icon: "📅" },
+  { id: "profile",      label: "My Profile",       icon: "👤" },
 ];
 
 export function PatientSidebar({ active, onNav }: { active: string; onNav: (id: string) => void }) {

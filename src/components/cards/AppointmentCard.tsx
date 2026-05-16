@@ -1,4 +1,5 @@
-import { RazorpayButton } from "@/components/RazorpayButton";
+"use client";
+import { PaymentOptions } from "@/components/PaymentOptions";
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING:   "badge-pending",
@@ -42,10 +43,10 @@ export function AppointmentCard({ appointment, onStatusChange }: { appointment: 
       </div>
 
       {appointment.status === "ACCEPTED" && !appointment.payment && appointment.consultationFee && (
-        <RazorpayButton
+        <PaymentOptions
           type="APPOINTMENT"
           referenceId={appointment.id}
-          label="Pay Now"
+          amount={Number(appointment.consultationFee)}
           onSuccess={onStatusChange}
         />
       )}

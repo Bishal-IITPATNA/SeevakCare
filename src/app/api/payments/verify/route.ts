@@ -17,9 +17,21 @@ export async function POST(req: NextRequest) {
   const payment = await prisma.payment.update({
     where: { razorpayOrderId },
     data:  { razorpayPaymentId, razorpaySignature, status: "SUCCESS" },
+    include: { emiPlan: { include: { installments: true } } },
   });
 
-  // Update linked entity
+  // If this is an EMI payment, mark installment #1 as paid
+  if (payment.emiPlan) {
+    const first = payment.emiPlan.installments.find(i => i.installmentNumber === 1);
+    if (first) {
+      await prisma.emiInstallment.update({
+        where: { id: first.id },
+        data:  { status: "PAID", paidAt: new Date(), razorpayPaymentId, razorpaySignature },
+      });
+    }
+  }
+
+  // Activate the linked service
   if (payment.medicineOrderId) {
     await prisma.medicineOrder.update({
       where: { id: payment.medicineOrderId },
@@ -32,22 +44,20 @@ export async function POST(req: NextRequest) {
       data:  { status: "CONFIRMED" },
     });
   }
-  if (payment.appointmentId) {
-    const appt = await prisma.appointment.findUnique({ where: { id: payment.appointmentId } });
-    if (appt?.status === "ACCEPTED") {
-      // Payment confirms the slot — keep status ACCEPTED (doctor still needs to complete)
-    }
-  }
 
-  // Create payment notification
+  const isEmi = !!payment.emiPlan;
+  const notifMsg = isEmi
+    ? `EMI instalment 1 of ${payment.emiPlan!.tenureMonths} paid — ₹${Number(payment.emiPlan!.monthlyEmi).toFixed(2)}. Ref: ${razorpayPaymentId}`
+    : `Your payment of ₹${Number(payment.amount).toFixed(2)} was successful. Ref: ${razorpayPaymentId}`;
+
   await prisma.notification.create({
     data: {
       userId:  user.id,
-      title:   "Payment Successful",
-      message: `Your payment of ₹${Number(payment.amount).toFixed(2)} was successful. Ref: ${razorpayPaymentId}`,
+      title:   isEmi ? "EMI Instalment Paid" : "Payment Successful",
+      message: notifMsg,
       type:    "PAYMENT",
     },
   });
 
-  return NextResponse.json({ message: "Payment verified successfully", paymentId: payment.id });
+  return NextResponse.json({ message: "Payment verified successfully", paymentId: payment.id, isEmi });
 }

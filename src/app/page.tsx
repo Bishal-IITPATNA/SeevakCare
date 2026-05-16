@@ -1,8 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const features = [
   { icon: "👨‍⚕️", title: "Book a Doctor",      desc: "Search verified doctors by specialization and city. Book slots online."    },
-  { icon: "🏥", title: "Hospital Visits",     desc: "Find hospital departments, check bed availability, and schedule visits."   },
+  { icon: "🏢", title: "Hospital Visits",     desc: "Find hospital departments, check bed availability, and schedule visits."   },
   { icon: "🧪", title: "Lab Tests",           desc: "Book diagnostic tests with home sample collection option."                  },
   { icon: "💊", title: "Medicine Delivery",   desc: "Order prescribed medicines with GST pricing and doorstep delivery."        },
   { icon: "📋", title: "Digital Prescriptions", desc: "Doctors issue digital prescriptions; download as PDF anytime."           },
@@ -16,8 +17,11 @@ export default function HomePage() {
       <nav className="border-b border-sky-100 bg-white/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🏥</span>
-            <span className="text-xl font-bold text-sky-700">Seevak Care</span>
+            <Image src="/logo.jpg" alt="Seevak Care" width={44} height={44} className="rounded-xl object-contain" />
+            <div>
+              <span className="text-xl font-bold text-sky-700">Seevak Care</span>
+              <p className="text-xs text-green-600 font-medium leading-none">Seeva Hamari, Suraksha Apki</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/login"    className="btn-secondary">Login</Link>
@@ -35,6 +39,7 @@ export default function HomePage() {
           Your Complete<br />
           <span className="text-sky-600">Digital Healthcare</span> Platform
         </h1>
+        <p className="text-green-600 font-semibold text-lg mb-3 tracking-wide">Seeva Hamari, Suraksha Apki</p>
         <p className="text-xl text-slate-500 mb-10 max-w-2xl mx-auto">
           Seevak Care connects patients, doctors, hospitals, and diagnostic labs — all in one seamless platform.
         </p>
@@ -86,8 +91,11 @@ export default function HomePage() {
       <footer className="border-t bg-white py-10 px-4">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🏥</span>
-            <span className="font-bold text-sky-700">Seevak Care</span>
+            <Image src="/logo.jpg" alt="Seevak Care" width={36} height={36} className="rounded-lg object-contain" />
+            <div>
+              <span className="font-bold text-sky-700">Seevak Care</span>
+              <p className="text-xs text-green-600 font-medium leading-none">Seeva Hamari, Suraksha Apki</p>
+            </div>
           </div>
           <p className="text-slate-400 text-sm">
             Support: <a href="mailto:seevakcare@gmail.com" className="text-sky-600">seevakcare@gmail.com</a> ·{" "}

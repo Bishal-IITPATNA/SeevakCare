@@ -8,6 +8,8 @@ import { AppointmentCard } from "@/components/cards/AppointmentCard";
 import { MedicineOrderCard } from "@/components/cards/MedicineOrderCard";
 import { LabBookingCard } from "@/components/cards/LabBookingCard";
 import { BookDoctor } from "@/components/BookDoctor";
+import { EmiPlansSection } from "@/components/EmiPlansSection";
+import { PrescriptionUploadSection } from "@/components/PrescriptionUploadSection";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS      = ["Male", "Female", "Other", "Prefer not to say"];
@@ -25,6 +27,8 @@ export default function PatientDashboard() {
   const [orderStep, setOrderStep]     = useState<"browse" | "checkout">("browse");
   const [delivery, setDelivery]       = useState({ address: "", city: "", pincode: "" });
   const [orderMsg, setOrderMsg]       = useState("");
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [hBookingSubmitting, setHBookingSubmitting] = useState(false);
 
   // Profile state
   const [profile, setProfile]         = useState<any>(null);
@@ -61,6 +65,14 @@ export default function PatientDashboard() {
       setMedicines(Array.isArray(meds) ? meds : []);
     });
   }, [router]);
+
+  // Auto-load all hospitals when the hospitals tab opens
+  useEffect(() => {
+    if (tab === "hospitals" && hospitals.length === 0 && !hospitalSearching) {
+      searchHospitals();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   // Load profile when profile tab opens
   useEffect(() => {
@@ -111,9 +123,11 @@ export default function PatientDashboard() {
   }
 
   async function bookHospitalAppointment() {
+    if (hBookingSubmitting) return;
     if (!selectedHospital || !hBooking.departmentId || !hBooking.appointmentDate || !hBooking.slotTime) {
       setHBookingMsg("Please fill all required fields."); return;
     }
+    setHBookingSubmitting(true);
     const res = await fetch("/api/appointments", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -134,6 +148,7 @@ export default function PatientDashboard() {
       const d = await res.json();
       setHBookingMsg(d.error ?? "Booking failed");
     }
+    setHBookingSubmitting(false);
   }
 
   function addToCart(med: any) {
@@ -154,9 +169,11 @@ export default function PatientDashboard() {
   const total        = parseFloat((cartSubtotal + gst + delivery_ch).toFixed(2));
 
   async function placeOrder() {
+    if (orderSubmitting) return;
     if (!delivery.address || !delivery.city || !delivery.pincode) {
       setOrderMsg("Please fill in all delivery details."); return;
     }
+    setOrderSubmitting(true);
     const items = cart.map(i => ({ medicineId: i.medicineId, quantity: i.quantity, unitPrice: i.unitPrice }));
     const res = await fetch("/api/medicine-orders", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -168,6 +185,7 @@ export default function PatientDashboard() {
       setOrders(Array.isArray(fresh) ? fresh : []);
       setTab("orders");
     } else { const d = await res.json(); setOrderMsg(d.error ?? "Failed to place order"); }
+    setOrderSubmitting(false);
   }
 
   const stats = [
@@ -183,8 +201,11 @@ export default function PatientDashboard() {
     prescriptions: "My Prescriptions",
     medicines:     "Order Medicines",
     lab:           "Lab Test Bookings",
-    "book-doctor": "Find & Book a Doctor",
+    orders:                "My Medicine Orders",
+    "prescriptions-upload": "My Prescriptions",
+    "book-doctor":         "Find & Book a Doctor",
     hospitals:     "Find a Hospital",
+    emi:           "My EMI Plans",
     profile:       "My Profile",
   };
 
@@ -315,7 +336,9 @@ export default function PatientDashboard() {
                   {orderMsg && <p className="text-red-500 text-sm mt-2">{orderMsg}</p>}
                   <div className="flex gap-2 mt-4">
                     <button onClick={() => setOrderStep("browse")} className="btn-secondary flex-1">← Back</button>
-                    <button onClick={placeOrder} className="btn-primary flex-1">Place Order & Get OTP</button>
+                    <button onClick={placeOrder} disabled={orderSubmitting} className="btn-primary flex-1">
+                      {orderSubmitting ? "Placing…" : "Place Order & Get OTP"}
+                    </button>
                   </div>
                 </div>
               )}
@@ -342,6 +365,10 @@ export default function PatientDashboard() {
 
           {tab === "book-doctor" && <BookDoctor />}
 
+          {tab === "emi" && <EmiPlansSection />}
+
+          {tab === "prescriptions-upload" && <PrescriptionUploadSection />}
+
           {/* Hospital search & booking */}
           {tab === "hospitals" && (
             <div>
@@ -367,8 +394,11 @@ export default function PatientDashboard() {
                     </button>
                   </div>
 
+                  {hospitalSearching && (
+                    <p className="text-slate-400 text-sm">Loading hospitals…</p>
+                  )}
                   {hospitals.length === 0 && !hospitalSearching && (
-                    <p className="text-slate-400 text-sm">Search hospitals by name or city to get started.</p>
+                    <p className="text-slate-400 text-sm">No hospitals found. Try a different name or city.</p>
                   )}
 
                   <div className="grid gap-3">
@@ -445,8 +475,8 @@ export default function PatientDashboard() {
                     </p>
                   )}
 
-                  <button onClick={bookHospitalAppointment} className="btn-primary w-full py-3">
-                    Confirm Booking →
+                  <button onClick={bookHospitalAppointment} disabled={hBookingSubmitting} className="btn-primary w-full py-3">
+                    {hBookingSubmitting ? "Booking…" : "Confirm Booking →"}
                   </button>
                 </div>
               )}

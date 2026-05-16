@@ -22,3 +22,7 @@ out/
 .vercel
 coverage/
 dist/
+
+# User-uploaded prescription files (keep directory via .gitkeep)
+public/uploads/prescriptions/*
+!public/uploads/prescriptions/.gitkeep

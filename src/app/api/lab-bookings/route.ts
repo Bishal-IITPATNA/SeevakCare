@@ -19,6 +19,23 @@ export async function POST(req: NextRequest) {
   const patient = await prisma.patient.findUnique({ where: { userId: user.id } });
   if (!patient) return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
 
+  // Duplicate-booking guard: same patient + test + store + date already pending/confirmed
+  const duplicate = await prisma.labBooking.findFirst({
+    where: {
+      patientId:    patient.id,
+      labTestId,
+      labStoreId,
+      scheduledDate: new Date(scheduledDate),
+      status: { notIn: ["CANCELLED"] },
+    },
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "You already have a booking for this test on this date." },
+      { status: 409 }
+    );
+  }
+
   const booking = await prisma.labBooking.create({
     data: {
       patientId:  patient.id,

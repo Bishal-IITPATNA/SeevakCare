@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Navbar } from "@/components/Navbar";
 import { StatsGrid } from "@/components/StatsGrid";
 
@@ -14,7 +15,7 @@ const APPT_BADGE: Record<string, string> = {
 
 const NAV = [
   { id: "overview",     label: "Overview",       icon: "🏠" },
-  { id: "departments",  label: "Departments",    icon: "🏥" },
+  { id: "departments",  label: "Departments",    icon: "🏢" },
   { id: "appointments", label: "Appointments",   icon: "📅" },
   { id: "info",         label: "Hospital Info",  icon: "✏️" },
   { id: "settings",     label: "Settings",       icon: "⚙️" },
@@ -78,7 +79,7 @@ export default function HospitalAdminDashboard() {
   const totalDoctors = departments.reduce((s: number, d: any) => s + (d.doctors?.length ?? 0), 0);
 
   const stats = [
-    { label: "Departments",    value: departments.length, icon: "🏥", color: "bg-blue-50 text-blue-700"    },
+    { label: "Departments",    value: departments.length, icon: "🏢", color: "bg-blue-50 text-blue-700"    },
     { label: "Total Beds",     value: totalBeds,          icon: "🛏️", color: "bg-indigo-50 text-indigo-700" },
     { label: "Occupancy",      value: `${occupancyPct}%`, icon: "📊", color: occupancyPct > 80 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700" },
     { label: "Pending Appts",  value: pendingAppts,       icon: "⏳", color: "bg-yellow-50 text-yellow-700" },
@@ -195,7 +196,7 @@ export default function HospitalAdminDashboard() {
         {/* Sidebar */}
         <aside className="w-56 shrink-0 bg-white border-r border-slate-100 min-h-screen p-4 hidden md:block">
           <div className="flex items-center gap-2 px-2 py-3 mb-4">
-            <span className="text-xl">🏥</span>
+            <Image src="/logo.jpg" alt="Seevak Care" width={32} height={32} className="rounded-lg object-contain shrink-0" />
             <span className="text-sm font-semibold text-slate-700 truncate">{hospital?.name ?? "Hospital Admin"}</span>
           </div>
           <nav className="space-y-1">

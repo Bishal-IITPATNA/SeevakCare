@@ -57,6 +57,24 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum EmiStatus {
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum PrescriptionUploadStatus {
+  PENDING
+  ORDERED
+  REJECTED
+}
+
 enum SampleCollectionType {
   HOME
   LAB
@@ -127,11 +145,12 @@ model Patient {
   pincode     String?
   createdAt   DateTime  @default(now())
 
-  user           User            @relation(fields: [userId], references: [id])
-  appointments   Appointment[]
-  prescriptions  Prescription[]
-  medicineOrders MedicineOrder[]
-  labBookings    LabBooking[]
+  user                  User                   @relation(fields: [userId], references: [id])
+  appointments          Appointment[]
+  prescriptions         Prescription[]
+  medicineOrders        MedicineOrder[]
+  labBookings           LabBooking[]
+  prescriptionUploads   PrescriptionUpload[]
 }
 
 // ───────────────────────────────────────────
@@ -403,9 +422,11 @@ model MedicineOrder {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
-  patient Patient             @relation(fields: [patientId], references: [id])
-  items   MedicineOrderItem[]
-  payment Payment?
+  patient              Patient              @relation(fields: [patientId], references: [id])
+  items                MedicineOrderItem[]
+  payment              Payment?
+  prescriptionUpload   PrescriptionUpload?  @relation(fields: [prescriptionUploadId], references: [id])
+  prescriptionUploadId String?
 }
 
 model MedicineOrderItem {
@@ -417,6 +438,25 @@ model MedicineOrderItem {
 
   medicineOrder MedicineOrder @relation(fields: [medicineOrderId], references: [id])
   medicine      Medicine      @relation(fields: [medicineId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// PRESCRIPTION UPLOADS (patient-uploaded)
+// ───────────────────────────────────────────
+
+model PrescriptionUpload {
+  id        String                   @id @default(cuid())
+  patientId String
+  fileUrl   String
+  fileName  String
+  notes     String?
+  status    PrescriptionUploadStatus @default(PENDING)
+  adminNote String?
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  patient        Patient         @relation(fields: [patientId], references: [id])
+  medicineOrders MedicineOrder[]
 }
 
 // ───────────────────────────────────────────
@@ -440,6 +480,40 @@ model Payment {
   appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
   medicineOrder MedicineOrder? @relation(fields: [medicineOrderId], references: [id])
   labBooking    LabBooking?    @relation(fields: [labBookingId], references: [id])
+  emiPlan       EmiPlan?
+}
+
+model EmiPlan {
+  id            String    @id @default(cuid())
+  paymentId     String    @unique
+  totalAmount   Decimal   @db.Decimal(10, 2)
+  interestRate  Decimal   @db.Decimal(5, 2)
+  tenureMonths  Int
+  monthlyEmi    Decimal   @db.Decimal(10, 2)
+  totalPayable  Decimal   @db.Decimal(10, 2)
+  status        EmiStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  payment      Payment          @relation(fields: [paymentId], references: [id])
+  installments EmiInstallment[]
+}
+
+model EmiInstallment {
+  id                String            @id @default(cuid())
+  emiPlanId         String
+  installmentNumber Int
+  dueDate           DateTime
+  amount            Decimal           @db.Decimal(10, 2)
+  razorpayOrderId   String?           @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  status            InstallmentStatus @default(PENDING)
+  paidAt            DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  emiPlan EmiPlan @relation(fields: [emiPlanId], references: [id])
 }
 
 // ───────────────────────────────────────────

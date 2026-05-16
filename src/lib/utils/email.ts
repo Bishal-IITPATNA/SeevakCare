@@ -35,8 +35,9 @@ function baseLayout(content: string) {
 <body style="margin:0;padding:0;background:#f0f9ff;font-family:'Segoe UI',sans-serif;">
   <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
     <div style="background:linear-gradient(135deg,#0284c7,#0ea5e9);padding:28px 32px;text-align:center;">
-      <span style="font-size:32px;">🏥</span>
-      <h1 style="color:#fff;font-size:22px;margin:8px 0 0;">${APP_NAME}</h1>
+      <span style="display:inline-block;background:rgba(255,255,255,0.2);border-radius:12px;padding:6px 16px;color:#fff;font-size:13px;font-weight:700;letter-spacing:1px;margin-bottom:8px;">SEEVAK CARE</span>
+      <h1 style="color:#fff;font-size:22px;margin:4px 0 0;">${APP_NAME}</h1>
+      <p style="color:rgba(255,255,255,0.85);font-size:11px;margin:4px 0 0;">Seeva Hamari, Suraksha Apki</p>
     </div>
     <div style="padding:32px;">
       ${content}

@@ -94,6 +94,25 @@ export async function POST(req: NextRequest) {
   const patient = await prisma.patient.findUnique({ where: { userId: user.id } });
   if (!patient) return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
 
+  // Duplicate-booking guard: same patient + same slot already exists and is not cancelled/declined
+  const duplicate = await prisma.appointment.findFirst({
+    where: {
+      patientId:       patient.id,
+      appointmentDate: new Date(appointmentDate),
+      slotTime,
+      ...(doctorId    ? { doctorId }    : {}),
+      ...(hospitalId  ? { hospitalId }  : {}),
+      ...(chamberId   ? { chamberId }   : {}),
+      status: { notIn: ["CANCELLED", "DECLINED"] },
+    },
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "You already have an appointment booked for this date and time." },
+      { status: 409 }
+    );
+  }
+
   // Validate slot against doctor's chamber schedule
   if (chamberId) {
     const date = new Date(appointmentDate);

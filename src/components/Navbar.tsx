@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -78,8 +79,11 @@ export function Navbar({ role, userName }: NavbarProps) {
     <header className="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl">🏥</span>
-          <span className="text-lg font-bold text-sky-700">Seevak Care</span>
+          <Image src="/logo.jpg" alt="Seevak Care" width={40} height={40} className="rounded-lg object-contain" />
+          <div>
+            <span className="text-lg font-bold text-sky-700">Seevak Care</span>
+            <p className="text-xs text-green-600 font-medium leading-none">Seeva Hamari, Suraksha Apki</p>
+          </div>
         </Link>
 
         <div className="flex items-center gap-4">

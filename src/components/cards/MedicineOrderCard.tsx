@@ -1,5 +1,5 @@
 "use client";
-import { RazorpayButton } from "@/components/RazorpayButton";
+import { PaymentOptions } from "@/components/PaymentOptions";
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING_APPROVAL: "badge bg-yellow-50 text-yellow-700",
@@ -67,10 +67,10 @@ export function MedicineOrderCard({ order, onUpdate }: { order: any; onUpdate?: 
       )}
 
       {order.status === "PAYMENT_PENDING" && (
-        <RazorpayButton
+        <PaymentOptions
           type="MEDICINE_ORDER"
           referenceId={order.id}
-          label="Pay Now"
+          amount={Number(order.totalAmount)}
           onSuccess={onUpdate}
         />
       )}
