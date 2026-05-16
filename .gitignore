@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build
+.next/
+out/
+
+# Environment variables — never commit
+.env
+.env.local
+.env.*.local
+
+# Database
+*.sqlite
+*.db
+
+# Misc
+.DS_Store
+*.log
+.vercel
+coverage/
+dist/

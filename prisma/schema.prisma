@@ -1,0 +1,459 @@
+// ================================================================
+// PRISMA SCHEMA — Seevak Care (Neon/Postgres)
+// ================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ───────────────────────────────────────────
+// ENUMS
+// ───────────────────────────────────────────
+
+enum Role {
+  PATIENT
+  DOCTOR
+  HOSPITAL_ADMIN
+  LAB_STORE
+  SYSTEM_ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING_APPROVAL
+  APPROVED
+  PAYMENT_PENDING
+  PAID
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum LabBookingStatus {
+  PENDING
+  CONFIRMED
+  SAMPLE_COLLECTED
+  REPORT_UPLOADED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum SampleCollectionType {
+  HOME
+  LAB
+}
+
+// ───────────────────────────────────────────
+// USER & AUTH
+// ───────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  phone         String?  @unique
+  passwordHash  String?
+  role          Role     @default(PATIENT)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  doctor        Doctor?
+  patient       Patient?
+  hospitalAdmin HospitalAdmin?
+  labStore      LabStore?
+
+  otps          OTP[]
+  sessions      Session[]
+  notifications Notification[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OTP {
+  id        String   @id @default(cuid())
+  userId    String
+  email     String
+  code      String
+  purpose   String   // "LOGIN" | "FORGOT_PASSWORD" | "MEDICINE_ORDER" | "LAB_BOOKING"
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose])
+}
+
+// ───────────────────────────────────────────
+// PATIENT
+// ───────────────────────────────────────────
+
+model Patient {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  dateOfBirth DateTime?
+  gender      String?
+  bloodGroup  String?
+  address     String?
+  city        String?
+  pincode     String?
+  createdAt   DateTime  @default(now())
+
+  user           User            @relation(fields: [userId], references: [id])
+  appointments   Appointment[]
+  prescriptions  Prescription[]
+  medicineOrders MedicineOrder[]
+  labBookings    LabBooking[]
+}
+
+// ───────────────────────────────────────────
+// DOCTOR
+// ───────────────────────────────────────────
+
+model Doctor {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  specialization  String
+  qualifications  String
+  licenseNumber   String   @unique
+  experienceYears Int
+  bio             String?
+  profileImageUrl String?
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  user              User               @relation(fields: [userId], references: [id])
+  chambers          Chamber[]
+  appointments      Appointment[]
+  prescriptions     Prescription[]
+  departmentDoctors DepartmentDoctor[]
+}
+
+model Chamber {
+  id              String   @id @default(cuid())
+  doctorId        String
+  name            String
+  address         String
+  city            String
+  consultationFee Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+
+  doctor       Doctor            @relation(fields: [doctorId], references: [id])
+  schedules    ChamberSchedule[]
+  appointments Appointment[]
+}
+
+model ChamberSchedule {
+  id                  String @id @default(cuid())
+  chamberId           String
+  dayOfWeek           Int    // 0=Sun … 6=Sat
+  startTime           String // "09:00"
+  endTime             String // "13:00"
+  slotDurationMinutes Int    @default(15)
+  maxSlots            Int    @default(20)
+
+  chamber Chamber @relation(fields: [chamberId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// HOSPITAL
+// ───────────────────────────────────────────
+
+model Hospital {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  city      String
+  phone     String
+  email     String
+  website   String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  departments  Department[]
+  admins       HospitalAdmin[]
+  appointments Appointment[]
+}
+
+model HospitalAdmin {
+  id         String @id @default(cuid())
+  userId     String @unique
+  hospitalId String
+
+  user     User     @relation(fields: [userId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+}
+
+model Department {
+  id           String   @id @default(cuid())
+  hospitalId   String
+  name         String
+  description  String?
+  totalBeds    Int
+  occupiedBeds Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  hospital     Hospital           @relation(fields: [hospitalId], references: [id])
+  doctors      DepartmentDoctor[]
+  appointments Appointment[]
+}
+
+model DepartmentDoctor {
+  id           String @id @default(cuid())
+  departmentId String
+  doctorId     String
+
+  department Department @relation(fields: [departmentId], references: [id])
+  doctor     Doctor     @relation(fields: [doctorId], references: [id])
+
+  @@unique([departmentId, doctorId])
+}
+
+// ───────────────────────────────────────────
+// APPOINTMENT
+// ───────────────────────────────────────────
+
+model Appointment {
+  id              String            @id @default(cuid())
+  patientId       String
+  doctorId        String?
+  chamberId       String?
+  hospitalId      String?
+  departmentId    String?
+  appointmentDate DateTime
+  slotTime        String
+  status          AppointmentStatus @default(PENDING)
+  notes           String?
+  reason          String?
+  consultationFee Decimal?          @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patient      Patient      @relation(fields: [patientId], references: [id])
+  doctor       Doctor?      @relation(fields: [doctorId], references: [id])
+  chamber      Chamber?     @relation(fields: [chamberId], references: [id])
+  hospital     Hospital?    @relation(fields: [hospitalId], references: [id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  prescription Prescription?
+  payment      Payment?
+}
+
+// ───────────────────────────────────────────
+// PRESCRIPTION
+// ───────────────────────────────────────────
+
+model Prescription {
+  id            String   @id @default(cuid())
+  appointmentId String   @unique
+  doctorId      String
+  patientId     String
+  diagnosis     String
+  notes         String?
+  pdfUrl        String?
+  createdAt     DateTime @default(now())
+
+  appointment Appointment          @relation(fields: [appointmentId], references: [id])
+  doctor      Doctor               @relation(fields: [doctorId], references: [id])
+  patient     Patient              @relation(fields: [patientId], references: [id])
+  medicines   PrescribedMedicine[]
+  labTests    PrescribedLabTest[]
+}
+
+model PrescribedMedicine {
+  id             String @id @default(cuid())
+  prescriptionId String
+  medicineName   String
+  dosage         String
+  frequency      String // "1-0-1", "1-1-1"
+  duration       String // "7 days"
+  instructions   String?
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+}
+
+model PrescribedLabTest {
+  id             String  @id @default(cuid())
+  prescriptionId String
+  testName       String
+  instructions   String?
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// LAB STORE & TESTS
+// ───────────────────────────────────────────
+
+model LabStore {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  name                 String
+  address              String
+  city                 String
+  phone                String
+  isVerified           Boolean  @default(false)
+  homeCollection       Boolean  @default(false)
+  homeCollectionCharge Decimal? @db.Decimal(10, 2)
+  createdAt            DateTime @default(now())
+
+  user     User       @relation(fields: [userId], references: [id])
+  tests    LabTest[]
+  bookings LabBooking[]
+}
+
+model LabTest {
+  id              String   @id @default(cuid())
+  labStoreId      String
+  name            String
+  description     String?
+  price           Decimal  @db.Decimal(10, 2)
+  turnaroundHours Int      @default(24)
+  instructions    String?
+  sampleType      String?  // "Blood", "Urine", etc.
+  createdAt       DateTime @default(now())
+
+  labStore LabStore   @relation(fields: [labStoreId], references: [id])
+  bookings LabBooking[]
+}
+
+model LabBooking {
+  id                String               @id @default(cuid())
+  patientId         String
+  labStoreId        String
+  labTestId         String
+  collectionType    SampleCollectionType @default(LAB)
+  collectionAddress String?
+  scheduledDate     DateTime
+  status            LabBookingStatus     @default(PENDING)
+  reportUrl         String?
+  otpCode           String?
+  otpVerified       Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  patient  Patient  @relation(fields: [patientId], references: [id])
+  labStore LabStore @relation(fields: [labStoreId], references: [id])
+  labTest  LabTest  @relation(fields: [labTestId], references: [id])
+  payment  Payment?
+}
+
+// ───────────────────────────────────────────
+// MEDICINES & ORDERS
+// ───────────────────────────────────────────
+
+model Medicine {
+  id                   String   @id @default(cuid())
+  name                 String
+  genericName          String?
+  manufacturer         String?
+  category             String?
+  price                Decimal  @db.Decimal(10, 2)
+  unit                 String   // "strip", "bottle", "tube"
+  stock                Int      @default(0)
+  imageUrl             String?
+  requiresPrescription Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  orderItems MedicineOrderItem[]
+}
+
+model MedicineOrder {
+  id                String      @id @default(cuid())
+  patientId         String
+  subtotal          Decimal     @db.Decimal(10, 2)
+  gstAmount         Decimal     @db.Decimal(10, 2)
+  deliveryCharge    Decimal     @db.Decimal(10, 2)
+  totalAmount       Decimal     @db.Decimal(10, 2)
+  status            OrderStatus @default(PENDING_APPROVAL)
+  deliveryAddress   String
+  deliveryCity      String
+  deliveryPincode   String
+  otpCode           String?
+  otpVerified       Boolean     @default(false)
+  trackingNumber    String?
+  estimatedDelivery DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  patient Patient             @relation(fields: [patientId], references: [id])
+  items   MedicineOrderItem[]
+  payment Payment?
+}
+
+model MedicineOrderItem {
+  id              String  @id @default(cuid())
+  medicineOrderId String
+  medicineId      String
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(10, 2)
+
+  medicineOrder MedicineOrder @relation(fields: [medicineOrderId], references: [id])
+  medicine      Medicine      @relation(fields: [medicineId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// PAYMENT
+// ───────────────────────────────────────────
+
+model Payment {
+  id                String        @id @default(cuid())
+  razorpayOrderId   String        @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  appointmentId     String?       @unique
+  medicineOrderId   String?       @unique
+  labBookingId      String?       @unique
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
+  medicineOrder MedicineOrder? @relation(fields: [medicineOrderId], references: [id])
+  labBooking    LabBooking?    @relation(fields: [labBookingId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// NOTIFICATIONS
+// ───────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   // "APPOINTMENT" | "ORDER" | "LAB" | "PAYMENT"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
