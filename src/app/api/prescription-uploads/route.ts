@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { writeFile } from "fs/promises";
-import path from "path";
+import { put } from "@vercel/blob";
 
 export async function POST(req: NextRequest) {
   const user = await getSessionUser(req);
@@ -30,16 +29,14 @@ export async function POST(req: NextRequest) {
   }
 
   const ext = file.name.split(".").pop();
-  const fileName = `${patient.id}_${Date.now()}.${ext}`;
-  const filePath = path.join(process.cwd(), "public", "uploads", "prescriptions", fileName);
+  const blobPath = `prescriptions/${patient.id}_${Date.now()}.${ext}`;
 
-  const bytes = await file.arrayBuffer();
-  await writeFile(filePath, Buffer.from(bytes));
+  const blob = await put(blobPath, file, { access: "public", contentType: file.type });
 
   const upload = await prisma.prescriptionUpload.create({
     data: {
       patientId: patient.id,
-      fileUrl:   `/uploads/prescriptions/${fileName}`,
+      fileUrl:   blob.url,
       fileName:  file.name,
       notes,
     },
