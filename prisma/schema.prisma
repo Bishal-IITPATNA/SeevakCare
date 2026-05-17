@@ -220,6 +220,7 @@ model Hospital {
   departments  Department[]
   admins       HospitalAdmin[]
   appointments Appointment[]
+  services     HospitalService[]
 }
 
 model HospitalAdmin {
@@ -243,6 +244,7 @@ model Department {
   hospital     Hospital           @relation(fields: [hospitalId], references: [id])
   doctors      DepartmentDoctor[]
   appointments Appointment[]
+  services     HospitalService[]
 }
 
 model DepartmentDoctor {
@@ -514,6 +516,37 @@ model EmiInstallment {
   updatedAt         DateTime          @updatedAt
 
   emiPlan EmiPlan @relation(fields: [emiPlanId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// HOSPITAL SERVICES & PRICING
+// ───────────────────────────────────────────
+
+model HospitalService {
+  id                 String   @id @default(cuid())
+  hospitalId         String
+  departmentId       String?
+  name               String
+  description        String?
+  category           String   // "Surgery" | "Diagnostics" | "Consultation" | "Therapy" | "Emergency" | "Maternity" | "Other"
+  price              Decimal  @db.Decimal(10, 2)
+  gstPercent         Decimal  @default(0) @db.Decimal(5, 2)
+  // Admission / stay details
+  admissionDays      Int      @default(0)  // 0 = outpatient / day-care
+  // Terms & conditions (pipe-separated lists for includes/excludes)
+  includes           String   @default("") // e.g. "Room charges|Nursing care|Surgeon fee"
+  excludes           String   @default("") // e.g. "ICU charges|Blood transfusion"
+  preOpInstructions  String?
+  postOpInstructions String?
+  paymentTerms       String?
+  cancellationPolicy String?
+  additionalTerms    String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  hospital   Hospital    @relation(fields: [hospitalId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
 }
 
 // ───────────────────────────────────────────

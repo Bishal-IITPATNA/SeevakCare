@@ -6,6 +6,110 @@ import { Navbar } from "@/components/Navbar";
 import { StatsGrid } from "@/components/StatsGrid";
 import { MobileDrawer } from "@/components/MobileDrawer";
 
+function TcSection({ title, text }: { title: string; text: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-slate-500 uppercase mb-1.5" dangerouslySetInnerHTML={{ __html: title }} />
+      <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-600 whitespace-pre-line leading-relaxed">
+        {text}
+      </div>
+    </div>
+  );
+}
+
+function ServiceForm({ form, setForm, departments, msg, onSubmit, submitLabel, cardClass }: {
+  form: any; setForm: (f: any) => void;
+  departments: any[];
+  msg: string; onSubmit: () => void; submitLabel: string; cardClass: string;
+}) {
+  const includesDisplay = form.includes?.split("|").join("\n") ?? "";
+  const excludesDisplay = form.excludes?.split("|").join("\n") ?? "";
+
+  return (
+    <div className={cardClass}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        {/* Row 1 */}
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Service Name *</label>
+          <input placeholder="e.g. Kidney Stone Removal (PCNL)" value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} className="input" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Category *</label>
+          <select value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} className="input">
+            {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {/* Row 2 */}
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Package Price (₹) *</label>
+          <input type="number" min="0" step="0.01" placeholder="85000" value={form.price} onChange={e => setForm((f: any) => ({ ...f, price: e.target.value }))} className="input" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">GST (%)</label>
+          <input type="number" min="0" max="28" step="0.01" placeholder="0" value={form.gstPercent} onChange={e => setForm((f: any) => ({ ...f, gstPercent: e.target.value }))} className="input" />
+        </div>
+        {/* Row 3 */}
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Admission Days (0 = Outpatient)</label>
+          <input type="number" min="0" value={form.admissionDays} onChange={e => setForm((f: any) => ({ ...f, admissionDays: e.target.value }))} className="input" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Department (optional)</label>
+          <select value={form.departmentId} onChange={e => setForm((f: any) => ({ ...f, departmentId: e.target.value }))} className="input">
+            <option value="">— None —</option>
+            {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        {/* Description */}
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-slate-600 mb-1">Short Description</label>
+          <input placeholder="Brief description of the procedure…" value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} className="input" />
+        </div>
+      </div>
+
+      {/* T&C section */}
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 mt-4">Terms &amp; Conditions</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">What's Included <span className="text-slate-400">(one item per line)</span></label>
+          <textarea rows={6} placeholder="Room charges&#10;Nursing care&#10;Surgeon fee" value={includesDisplay}
+            onChange={e => setForm((f: any) => ({ ...f, includes: e.target.value.split("\n").join("|") }))}
+            className="input resize-y text-xs" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">What's Excluded <span className="text-slate-400">(one item per line)</span></label>
+          <textarea rows={6} placeholder="ICU charges&#10;Blood transfusion" value={excludesDisplay}
+            onChange={e => setForm((f: any) => ({ ...f, excludes: e.target.value.split("\n").join("|") }))}
+            className="input resize-y text-xs" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Pre-operative Instructions</label>
+          <textarea rows={5} value={form.preOpInstructions} onChange={e => setForm((f: any) => ({ ...f, preOpInstructions: e.target.value }))} className="input resize-y text-xs" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Post-operative / Discharge Instructions</label>
+          <textarea rows={5} value={form.postOpInstructions} onChange={e => setForm((f: any) => ({ ...f, postOpInstructions: e.target.value }))} className="input resize-y text-xs" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Payment Terms</label>
+          <textarea rows={5} value={form.paymentTerms} onChange={e => setForm((f: any) => ({ ...f, paymentTerms: e.target.value }))} className="input resize-y text-xs" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Cancellation &amp; Refund Policy</label>
+          <textarea rows={5} value={form.cancellationPolicy} onChange={e => setForm((f: any) => ({ ...f, cancellationPolicy: e.target.value }))} className="input resize-y text-xs" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-slate-600 mb-1">Additional Terms &amp; Conditions</label>
+          <textarea rows={5} value={form.additionalTerms} onChange={e => setForm((f: any) => ({ ...f, additionalTerms: e.target.value }))} className="input resize-y text-xs" />
+        </div>
+      </div>
+
+      {msg && <p className="text-red-500 text-sm mb-2">{msg}</p>}
+      <button onClick={onSubmit} className="btn-primary text-sm">{submitLabel}</button>
+    </div>
+  );
+}
+
 const APPT_BADGE: Record<string, string> = {
   PENDING:   "badge bg-yellow-50 text-yellow-700",
   ACCEPTED:  "badge bg-green-50 text-green-700",
@@ -17,10 +121,25 @@ const APPT_BADGE: Record<string, string> = {
 const NAV = [
   { id: "overview",     label: "Overview",       icon: "🏠" },
   { id: "departments",  label: "Departments",    icon: "🏢" },
+  { id: "services",     label: "Services",       icon: "💊" },
   { id: "appointments", label: "Appointments",   icon: "📅" },
   { id: "info",         label: "Hospital Info",  icon: "✏️" },
   { id: "settings",     label: "Settings",       icon: "⚙️" },
 ];
+
+const SERVICE_CATEGORIES = ["Surgery", "Diagnostics", "Consultation", "Therapy", "Emergency", "Maternity", "Rehabilitation", "Other"];
+
+const BLANK_SERVICE = {
+  name: "", description: "", category: "Surgery", departmentId: "",
+  price: "", gstPercent: "0", admissionDays: "1",
+  includes: "Room charges (General ward)\nNursing care\nSurgeon fee\nAnesthesia fee\nOperation theater charges\nBasic medications (as per protocol)\nPre-operative investigations\nPost-operative dressings",
+  excludes: "ICU charges (if required)\nBlood and blood products\nImplants and prosthetics\nSpecialized investigations\nPrivate room upgrade\nPersonal care items",
+  preOpInstructions: "• Complete fasting (no food or water) for 8 hours before surgery\n• All routine blood tests, ECG and X-ray must be completed before admission\n• Inform doctor of all current medications; some may be stopped 7 days prior\n• Bathing with antiseptic soap the night before is recommended\n• Bring a responsible adult attendant for post-operative care",
+  postOpInstructions: "• Follow-up visit is mandatory within 7 days of discharge\n• Suture / stitch removal will be scheduled by the treating surgeon\n• Activity restriction as per surgeon's advice for 2-4 weeks\n• Any sign of fever, wound redness, swelling or discharge — report immediately\n• Take all prescribed medications as directed; do not self-medicate",
+  paymentTerms: "• 50% advance payment is required at the time of admission\n• Remaining balance must be settled before discharge\n• Accepted modes of payment: Cash, Credit/Debit card, UPI, Net banking\n• EMI facility available on select cards (minimum 3 months)\n• Insurance: Pre-authorization must be obtained before admission",
+  cancellationPolicy: "• Surgery rescheduled by patient 48+ hours prior: No cancellation charge\n• Surgery rescheduled by patient within 48 hours: ₹2,000 rescheduling fee\n• Surgery cancelled after admission: Admission and investigation charges are non-refundable\n• No-show without prior intimation: Advance deposit forfeited\n• Hospital-initiated postponement: Full advance refunded within 7 working days",
+  additionalTerms: "• Package rates are valid for 30 days from the date of quotation\n• Rates are subject to change without prior notice after the validity period\n• This is an estimated package; final billing may vary depending on clinical condition\n• The hospital reserves the right to shift the patient to ICU / HDU if medically necessary (charges extra)\n• In case of complications requiring extended stay, per-day charges will apply\n• The treating surgeon reserves the right to modify the surgical plan based on intra-operative findings\n• All disputes are subject to the jurisdiction of local courts only",
+};
 
 export default function HospitalAdminDashboard() {
   const router = useRouter();
@@ -53,6 +172,16 @@ export default function HospitalAdminDashboard() {
   const [pwdForm, setPwdForm]   = useState({ currentPassword: "", newPassword: "" });
   const [pwdMsg, setPwdMsg]     = useState("");
 
+  // Services
+  const [services, setServices]           = useState<any[]>([]);
+  const [showAddSvc, setShowAddSvc]       = useState(false);
+  const [svcForm, setSvcForm]             = useState<any>(BLANK_SERVICE);
+  const [svcMsg, setSvcMsg]               = useState("");
+  const [editSvc, setEditSvc]             = useState<any>(null);
+  const [editSvcForm, setEditSvcForm]     = useState<any>(BLANK_SERVICE);
+  const [editSvcMsg, setEditSvcMsg]       = useState("");
+  const [expandedSvc, setExpandedSvc]     = useState<string | null>(null);
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
       if (!r.ok) { router.push("/login"); return null; }
@@ -60,8 +189,14 @@ export default function HospitalAdminDashboard() {
     }).then(u => { if (u) setUser(u); });
 
     loadHospital();
+    loadServices();
     fetch("/api/appointments").then(r => r.json()).then(d => setAppointments(Array.isArray(d) ? d : []));
   }, [router]);
+
+  async function loadServices() {
+    const res = await fetch("/api/hospital-admin/services");
+    if (res.ok) setServices(await res.json());
+  }
 
   async function loadHospital() {
     const res = await fetch("/api/hospital");
@@ -79,11 +214,14 @@ export default function HospitalAdminDashboard() {
   const pendingAppts = appointments.filter((a: any) => a.status === "PENDING").length;
   const totalDoctors = departments.reduce((s: number, d: any) => s + (d.doctors?.length ?? 0), 0);
 
+  const activeServices = services.filter((s: any) => s.isActive).length;
+
   const stats = [
     { label: "Departments",    value: departments.length, icon: "🏢", color: "bg-blue-50 text-blue-700"    },
     { label: "Total Beds",     value: totalBeds,          icon: "🛏️", color: "bg-indigo-50 text-indigo-700" },
     { label: "Occupancy",      value: `${occupancyPct}%`, icon: "📊", color: occupancyPct > 80 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700" },
     { label: "Pending Appts",  value: pendingAppts,       icon: "⏳", color: "bg-yellow-50 text-yellow-700" },
+    { label: "Active Services",value: activeServices,     icon: "💊", color: "bg-violet-50 text-violet-700" },
   ];
 
   // ── Hospital info ──────────────────────────────────────────────────────────
@@ -175,6 +313,43 @@ export default function HospitalAdminDashboard() {
       body: JSON.stringify({ status }),
     });
     if (res.ok) setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+  }
+
+  // ── Services ───────────────────────────────────────────────────────────────
+
+  async function addService() {
+    setSvcMsg("");
+    if (!svcForm.name || !svcForm.category || !svcForm.price) { setSvcMsg("Name, category and price are required."); return; }
+    const res = await fetch("/api/hospital-admin/services", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...svcForm, price: Number(svcForm.price), gstPercent: Number(svcForm.gstPercent), admissionDays: Number(svcForm.admissionDays) }),
+    });
+    if (res.ok) { setSvcForm(BLANK_SERVICE); setShowAddSvc(false); loadServices(); }
+    else { const d = await res.json(); setSvcMsg(d.error ?? "Failed to add service"); }
+  }
+
+  async function saveEditSvc() {
+    setEditSvcMsg("");
+    const res = await fetch(`/api/hospital-admin/services/${editSvc.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...editSvcForm, price: Number(editSvcForm.price), gstPercent: Number(editSvcForm.gstPercent), admissionDays: Number(editSvcForm.admissionDays) }),
+    });
+    if (res.ok) { setEditSvc(null); loadServices(); }
+    else { const d = await res.json(); setEditSvcMsg(d.error ?? "Update failed"); }
+  }
+
+  async function deleteService(id: string) {
+    if (!confirm("Delete this service? This cannot be undone.")) return;
+    await fetch(`/api/hospital-admin/services/${id}`, { method: "DELETE" });
+    loadServices();
+  }
+
+  async function toggleSvcActive(svc: any) {
+    await fetch(`/api/hospital-admin/services/${svc.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !svc.isActive }),
+    });
+    loadServices();
   }
 
   // ── Password ───────────────────────────────────────────────────────────────
@@ -418,6 +593,162 @@ export default function HospitalAdminDashboard() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Services */}
+          {tab === "services" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-slate-800">Hospital Services &amp; Charges</h1>
+                <button onClick={() => { setShowAddSvc(v => !v); setSvcMsg(""); }} className="btn-primary text-sm">
+                  {showAddSvc ? "Cancel" : "+ Add Service"}
+                </button>
+              </div>
+
+              {/* Add service form */}
+              {showAddSvc && (
+                <ServiceForm
+                  form={svcForm} setForm={setSvcForm}
+                  departments={departments}
+                  msg={svcMsg}
+                  onSubmit={addService}
+                  submitLabel="Add Service"
+                  cardClass="card border-sky-200 bg-sky-50/40"
+                />
+              )}
+
+              {/* Edit service inline */}
+              {editSvc && (
+                <div className="card border-amber-200 bg-amber-50/30 space-y-2">
+                  <h3 className="font-semibold text-slate-700">Edit — {editSvc.name}</h3>
+                  <ServiceForm
+                    form={editSvcForm} setForm={setEditSvcForm}
+                    departments={departments}
+                    msg={editSvcMsg}
+                    onSubmit={saveEditSvc}
+                    submitLabel="Save Changes"
+                    cardClass=""
+                  />
+                  <button onClick={() => setEditSvc(null)} className="btn-secondary text-sm mt-1">Cancel</button>
+                </div>
+              )}
+
+              {/* Group by category */}
+              {services.length === 0 && !showAddSvc && (
+                <p className="text-slate-400 text-sm">No services configured yet. Add one to display charges to patients.</p>
+              )}
+
+              {Array.from(new Set(services.map((s: any) => s.category))).map((cat: any) => (
+                <div key={cat}>
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">{cat}</h2>
+                  <div className="space-y-3">
+                    {services.filter((s: any) => s.category === cat).map((svc: any) => {
+                      const priceWithGst = Number(svc.price) * (1 + Number(svc.gstPercent) / 100);
+                      const includesList = svc.includes ? svc.includes.split("|").filter(Boolean) : [];
+                      const excludesList = svc.excludes ? svc.excludes.split("|").filter(Boolean) : [];
+                      const isExpanded = expandedSvc === svc.id;
+                      return (
+                        <div key={svc.id} className={`card border ${svc.isActive ? "border-slate-200" : "border-slate-100 opacity-60"}`}>
+                          {/* Header row */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <p className="font-semibold text-slate-800">{svc.name}</p>
+                                {svc.department && (
+                                  <span className="badge bg-sky-50 text-sky-700 text-xs">{svc.department.name}</span>
+                                )}
+                                {!svc.isActive && <span className="badge bg-slate-100 text-slate-400 text-xs">Inactive</span>}
+                              </div>
+                              {svc.description && <p className="text-xs text-slate-500 mb-1">{svc.description}</p>}
+                              <div className="flex items-baseline gap-3 flex-wrap">
+                                <span className="text-lg font-bold text-slate-900">₹{Number(svc.price).toLocaleString("en-IN")}</span>
+                                {Number(svc.gstPercent) > 0 && (
+                                  <span className="text-xs text-slate-400">+{svc.gstPercent}% GST = ₹{priceWithGst.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                                )}
+                                <span className="text-xs text-slate-400">
+                                  {Number(svc.admissionDays) === 0 ? "Outpatient / Day-care" : `${svc.admissionDays} day${Number(svc.admissionDays) > 1 ? "s" : ""} admission`}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                              <div className="flex gap-1.5">
+                                <button onClick={() => { setEditSvc(svc); setEditSvcForm({ name: svc.name, description: svc.description ?? "", category: svc.category, departmentId: svc.departmentId ?? "", price: svc.price.toString(), gstPercent: svc.gstPercent.toString(), admissionDays: svc.admissionDays.toString(), includes: svc.includes, excludes: svc.excludes, preOpInstructions: svc.preOpInstructions ?? "", postOpInstructions: svc.postOpInstructions ?? "", paymentTerms: svc.paymentTerms ?? "", cancellationPolicy: svc.cancellationPolicy ?? "", additionalTerms: svc.additionalTerms ?? "" }); setEditSvcMsg(""); setExpandedSvc(null); }} className="btn-secondary text-xs">✏️ Edit</button>
+                                <button onClick={() => deleteService(svc.id)} className="text-xs text-red-400 hover:text-red-600 border border-red-200 px-2 py-1 rounded-lg">Delete</button>
+                              </div>
+                              <button onClick={() => toggleSvcActive(svc)} className={`text-xs px-2 py-1 rounded-lg border ${svc.isActive ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}>
+                                {svc.isActive ? "Deactivate" : "Activate"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* T&C toggle */}
+                          <button onClick={() => setExpandedSvc(isExpanded ? null : svc.id)} className="mt-3 flex items-center gap-1.5 text-xs text-sky-600 hover:text-sky-800 font-medium">
+                            <span>{isExpanded ? "▲" : "▼"}</span> Terms &amp; Conditions
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-3 pt-3 border-t border-slate-100 space-y-4 text-sm">
+                              {/* Includes / Excludes */}
+                              <div className="grid sm:grid-cols-2 gap-4">
+                                {includesList.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-green-700 uppercase mb-1.5">Included in Package</p>
+                                    <ul className="space-y-0.5">
+                                      {includesList.map((item: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-1.5 text-slate-600 text-xs">
+                                          <span className="text-green-500 mt-0.5">✓</span> {item.trim()}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {excludesList.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-600 uppercase mb-1.5">Not Included</p>
+                                    <ul className="space-y-0.5">
+                                      {excludesList.map((item: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-1.5 text-slate-600 text-xs">
+                                          <span className="text-red-400 mt-0.5">✗</span> {item.trim()}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Pre-op */}
+                              {svc.preOpInstructions && (
+                                <TcSection title="Pre-operative Instructions" text={svc.preOpInstructions} />
+                              )}
+
+                              {/* Post-op */}
+                              {svc.postOpInstructions && (
+                                <TcSection title="Post-operative / Discharge Instructions" text={svc.postOpInstructions} />
+                              )}
+
+                              {/* Payment */}
+                              {svc.paymentTerms && (
+                                <TcSection title="Payment Terms" text={svc.paymentTerms} />
+                              )}
+
+                              {/* Cancellation */}
+                              {svc.cancellationPolicy && (
+                                <TcSection title="Cancellation &amp; Refund Policy" text={svc.cancellationPolicy} />
+                              )}
+
+                              {/* Additional */}
+                              {svc.additionalTerms && (
+                                <TcSection title="Additional Terms &amp; Conditions" text={svc.additionalTerms} />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
