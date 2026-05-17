@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Navbar } from "@/components/Navbar";
 import { StatsGrid } from "@/components/StatsGrid";
+import { MobileDrawer } from "@/components/MobileDrawer";
 
 const APPT_BADGE: Record<string, string> = {
   PENDING:   "badge bg-yellow-50 text-yellow-700",
@@ -193,7 +194,7 @@ export default function HospitalAdminDashboard() {
     <div className="flex flex-col min-h-screen">
       <Navbar role={user?.role} userName={user?.name} />
       <div className="flex flex-1">
-        {/* Sidebar */}
+        {/* Desktop sidebar */}
         <aside className="w-56 shrink-0 bg-white border-r border-slate-100 min-h-screen p-4 hidden md:block">
           <div className="flex items-center gap-2 px-2 py-3 mb-4">
             <Image src="/logo.jpg" alt="Seevak Care" width={32} height={32} className="rounded-lg object-contain shrink-0" />
@@ -210,6 +211,31 @@ export default function HospitalAdminDashboard() {
             ))}
           </nav>
         </aside>
+
+        {/* Mobile drawer */}
+        <MobileDrawer>
+          {(close) => (
+            <aside className="w-64 bg-white border-r border-slate-100 min-h-screen p-4 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Image src="/logo.jpg" alt="Seevak Care" width={28} height={28} className="rounded-lg object-contain shrink-0" />
+                  <span className="text-sm font-semibold text-slate-700 truncate">{hospital?.name ?? "Hospital Admin"}</span>
+                </div>
+                <button onClick={close} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+              </div>
+              <nav className="space-y-1">
+                {NAV.map(item => (
+                  <button key={item.id} onClick={() => { setTab(item.id); close(); }}
+                    className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      tab === item.id ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"
+                    }`}>
+                    <span>{item.icon}</span> {item.label}
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          )}
+        </MobileDrawer>
 
         <main className="flex-1 p-6 lg:p-8 max-w-5xl space-y-6">
 
