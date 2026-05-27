@@ -276,23 +276,59 @@ export default function SystemAdminDashboard() {
           )}
 
           {tab === "approvals" && (
-            <div className="grid gap-3">
+            <div className="grid gap-4">
               <p className="text-sm text-slate-500">{pendingApproval.length} orders awaiting approval</p>
               {pendingApproval.map(o => (
-                <div key={o.id} className="card flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={ORDER_STATUS_BADGES[o.status]}>{o.status.replace("_", " ")}</span>
-                      <span className="text-xs text-slate-400">{new Date(o.createdAt).toDateString()}</span>
+                <div key={o.id} className="card">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={ORDER_STATUS_BADGES[o.status]}>{o.status.replace("_", " ")}</span>
+                        <span className="text-xs text-slate-400">{new Date(o.createdAt).toDateString()}</span>
+                      </div>
+                      <p className="font-semibold text-slate-800">{o.patient?.user?.name}</p>
+                      <p className="text-xs text-slate-400">{o.patient?.user?.phone} · {o.patient?.user?.email}</p>
+                      <p className="text-xs text-slate-400 mt-1">📦 {o.deliveryAddress}, {o.deliveryCity} — {o.deliveryPincode}</p>
                     </div>
-                    <p className="font-semibold text-slate-800">{o.patient?.user?.name}</p>
-                    <p className="text-sm text-slate-500">{o.items?.length} items · {formatINR(Number(o.totalAmount))}</p>
-                    <p className="text-xs text-slate-400">📦 {o.deliveryAddress}, {o.deliveryCity}</p>
-                    <div className="text-xs text-slate-400 mt-1">
-                      GST: {formatINR(Number(o.gstAmount))} · Delivery: {formatINR(Number(o.deliveryCharge))}
-                    </div>
+                    <button onClick={() => approveOrder(o.id)} className="btn-primary whitespace-nowrap self-start">
+                      ✅ Approve
+                    </button>
                   </div>
-                  <button onClick={() => approveOrder(o.id)} className="btn-primary whitespace-nowrap">Approve</button>
+
+                  {/* Medicine items table */}
+                  {o.items?.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-slate-100 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-slate-500 font-medium">Medicine</th>
+                            <th className="text-center px-3 py-2 text-slate-500 font-medium">Qty</th>
+                            <th className="text-right px-3 py-2 text-slate-500 font-medium">Unit Price</th>
+                            <th className="text-right px-3 py-2 text-slate-500 font-medium">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {o.items.map((item: any) => (
+                            <tr key={item.id} className="border-t border-slate-50">
+                              <td className="px-3 py-2 text-slate-700 font-medium">{item.medicine?.name ?? "—"}</td>
+                              <td className="px-3 py-2 text-center text-slate-600">×{item.quantity}</td>
+                              <td className="px-3 py-2 text-right text-slate-500">{formatINR(Number(item.unitPrice))}</td>
+                              <td className="px-3 py-2 text-right text-slate-700 font-medium">{formatINR(Number(item.unitPrice) * item.quantity)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Price summary */}
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500 border-t border-slate-100 pt-3">
+                    <span>Subtotal: <strong className="text-slate-700">{formatINR(Number(o.totalAmount) - Number(o.gstAmount) - Number(o.deliveryCharge))}</strong></span>
+                    <span>GST: <strong className="text-slate-700">{formatINR(Number(o.gstAmount))}</strong></span>
+                    <span>Delivery: <strong className="text-slate-700">{formatINR(Number(o.deliveryCharge))}</strong></span>
+                    <span className="ml-auto text-sm font-bold text-sky-700">Total: {formatINR(Number(o.totalAmount))}</span>
+                  </div>
                 </div>
               ))}
               {pendingApproval.length === 0 && <p className="text-slate-400 text-sm">No orders pending approval. 🎉</p>}
@@ -311,8 +347,33 @@ export default function SystemAdminDashboard() {
                         <span className={ORDER_STATUS_BADGES[o.status]}>{o.status.replace(/_/g, " ")}</span>
                       </div>
                       <p className="font-semibold text-slate-800">{o.patient?.user?.name}</p>
-                      <p className="text-sm text-slate-500">{formatINR(Number(o.totalAmount))} · {o.items?.length} items</p>
-                      <p className="text-xs text-slate-400 mb-3">📦 {o.deliveryAddress}, {o.deliveryCity} — {o.deliveryPincode}</p>
+                      <p className="text-xs text-slate-400">{o.patient?.user?.phone}</p>
+                      <p className="text-xs text-slate-400 mb-2">📦 {o.deliveryAddress}, {o.deliveryCity} — {o.deliveryPincode}</p>
+
+                      {/* Medicine items */}
+                      {o.items?.length > 0 && (
+                        <div className="mb-3 rounded-lg border border-slate-100 overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-slate-50">
+                              <tr>
+                                <th className="text-left px-3 py-1.5 text-slate-500 font-medium">Medicine</th>
+                                <th className="text-center px-3 py-1.5 text-slate-500 font-medium">Qty</th>
+                                <th className="text-right px-3 py-1.5 text-slate-500 font-medium">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {o.items.map((item: any) => (
+                                <tr key={item.id} className="border-t border-slate-50">
+                                  <td className="px-3 py-1.5 text-slate-700 font-medium">{item.medicine?.name ?? "—"}</td>
+                                  <td className="px-3 py-1.5 text-center text-slate-600">×{item.quantity}</td>
+                                  <td className="px-3 py-1.5 text-right text-slate-700">{formatINR(Number(item.unitPrice) * item.quantity)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      <p className="text-sm font-semibold text-sky-700 mb-3">Total: {formatINR(Number(o.totalAmount))}</p>
                       <div className="flex gap-2 flex-wrap">
                         <input placeholder="Tracking number"
                           value={tracking[o.id]?.trackingNumber ?? ""}
