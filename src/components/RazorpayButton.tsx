@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 interface Props {
   type: "MEDICINE_ORDER" | "LAB_BOOKING" | "APPOINTMENT";
@@ -103,13 +104,13 @@ export function RazorpayButton({ type, referenceId, label = "Pay Now", disabled,
         />
         <span className="text-xs text-slate-500 leading-relaxed">
           I agree to the{" "}
-          <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+          <Link href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
             Terms &amp; Conditions
-          </a>{" "}
+          </Link>{" "}
           and{" "}
-          <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+          <Link href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
             Refund Policy
-          </a>{" "}
+          </Link>{" "}
           of Seevak Care (Radius Care Well India Pvt Ltd)
         </span>
       </label>

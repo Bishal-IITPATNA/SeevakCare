@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { calculateEmi, EMI_ANNUAL_RATE, EMI_TENURES, type EmiTenure } from "@/lib/utils/emi";
 
 declare global {
@@ -135,13 +136,13 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         />
         <span className="text-xs text-slate-500 leading-relaxed">
           I agree to the{" "}
-          <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+          <Link href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
             Terms &amp; Conditions
-          </a>{" "}
+          </Link>{" "}
           and{" "}
-          <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+          <Link href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
             Refund Policy
-          </a>{" "}
+          </Link>{" "}
           of Seevak Care (Radius Care Well India Pvt Ltd)
         </span>
       </label>

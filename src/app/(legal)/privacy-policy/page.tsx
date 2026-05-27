@@ -89,7 +89,7 @@ export default function PrivacyPolicyPage() {
         <p>We do not sell, rent, or trade your personal information to third parties. We share your information only in the following circumstances:</p>
         <ul className="list-disc pl-5 space-y-1.5">
           <li><strong>Healthcare Providers:</strong> Doctors, hospitals, and labs you book with receive the information required to deliver care (e.g., your name, contact details, appointment purpose, prescription).</li>
-          <li><strong>Payment Processors:</strong> Razorpay receives transaction data necessary to process payments. Razorpay's own privacy policy governs their data practices.</li>
+          <li><strong>Payment Processors:</strong> Razorpay receives transaction data necessary to process payments. Razorpay&apos;s own privacy policy governs their data practices.</li>
           <li><strong>Communication Services:</strong> Third-party SMTP and SMS providers may process your email address or phone number solely to deliver OTPs, confirmations, and appointment reminders.</li>
           <li><strong>Legal Requirements:</strong> We may disclose your information to law enforcement, courts, or government authorities when required by law or to protect the rights and safety of our users.</li>
           <li><strong>Business Transfers:</strong> In the event of a merger, acquisition, or asset sale, your data may be transferred to the successor entity, who will be bound by this Privacy Policy.</li>
@@ -103,7 +103,7 @@ export default function PrivacyPolicyPage() {
           <li>Passwords are hashed using bcrypt and never stored in plain text</li>
           <li>OTP-based authentication adds a second layer of identity verification</li>
           <li>Access to health data is role-restricted — only relevant healthcare providers and platform administrators can view records pertaining to their scope</li>
-          <li>Payment data is handled exclusively by Razorpay's PCI-DSS compliant infrastructure</li>
+          <li>Payment data is handled exclusively by Razorpay&apos;s PCI-DSS compliant infrastructure</li>
         </ul>
         <p>Despite these measures, no system is 100% secure. Please notify us immediately at <a href="mailto:seevakcare@gmail.com" className="text-sky-600 underline">seevakcare@gmail.com</a> if you suspect unauthorised access to your account.</p>
       </Section>
