@@ -71,13 +71,13 @@ function ServiceForm({ form, setForm, departments, msg, onSubmit, submitLabel, c
       <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 mt-4">Terms &amp; Conditions</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">What's Included <span className="text-slate-400">(one item per line)</span></label>
+          <label className="block text-xs font-medium text-slate-600 mb-1">What&apos;s Included <span className="text-slate-400">(one item per line)</span></label>
           <textarea rows={6} placeholder="Room charges&#10;Nursing care&#10;Surgeon fee" value={includesDisplay}
             onChange={e => setForm((f: any) => ({ ...f, includes: e.target.value.split("\n").join("|") }))}
             className="input resize-y text-xs" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">What's Excluded <span className="text-slate-400">(one item per line)</span></label>
+          <label className="block text-xs font-medium text-slate-600 mb-1">What&apos;s Excluded <span className="text-slate-400">(one item per line)</span></label>
           <textarea rows={6} placeholder="ICU charges&#10;Blood transfusion" value={excludesDisplay}
             onChange={e => setForm((f: any) => ({ ...f, excludes: e.target.value.split("\n").join("|") }))}
             className="input resize-y text-xs" />
