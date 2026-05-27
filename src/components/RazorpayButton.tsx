@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface Props {
   type: "MEDICINE_ORDER" | "LAB_BOOKING" | "APPOINTMENT";
   referenceId: string;
@@ -25,6 +27,8 @@ async function loadRazorpayScript(): Promise<void> {
 }
 
 export function RazorpayButton({ type, referenceId, label = "Pay Now", disabled, onSuccess, onError }: Props) {
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   async function handlePayment() {
     try {
       await loadRazorpayScript();
@@ -49,10 +53,15 @@ export function RazorpayButton({ type, referenceId, label = "Pay Now", disabled,
         currency:   data.currency,
         order_id:   data.razorpayOrderId,
         name:       "Seevak Care",
-        description: `Payment for ${type.replace("_", " ")}`,
-        image:      "/logo.png",
+        description: `Payment for ${type.replace(/_/g, " ")}`,
+        image:      "/logo.jpg",
         theme:      { color: "#0284c7" },
-        prefill: {},
+        prefill:    {},
+        notes: {
+          merchant_legal_entity: "RADIUS CARE WELL INDIA PRIVATE LIMITED",
+          terms_url: "/terms-and-conditions",
+          refund_url: "/refund-policy",
+        },
         handler: async (response: any) => {
           const verifyRes = await fetch("/api/payments/verify", {
             method:  "POST",
@@ -83,12 +92,34 @@ export function RazorpayButton({ type, referenceId, label = "Pay Now", disabled,
   }
 
   return (
-    <button
-      onClick={handlePayment}
-      disabled={disabled}
-      className="btn-primary flex items-center gap-2"
-    >
-      <span>💳</span> {label}
-    </button>
+    <div className="space-y-2">
+      {/* T&C acceptance — required by Razorpay guidelines */}
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={termsAccepted}
+          onChange={(e) => setTermsAccepted(e.target.checked)}
+          className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 shrink-0"
+        />
+        <span className="text-xs text-slate-500 leading-relaxed">
+          I agree to the{" "}
+          <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+            Terms &amp; Conditions
+          </a>{" "}
+          and{" "}
+          <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+            Refund Policy
+          </a>{" "}
+          of Seevak Care (Radius Care Well India Pvt Ltd)
+        </span>
+      </label>
+      <button
+        onClick={handlePayment}
+        disabled={disabled || !termsAccepted}
+        className="btn-primary flex items-center gap-2"
+      >
+        <span>💳</span> {label}
+      </button>
+    </div>
   );
 }

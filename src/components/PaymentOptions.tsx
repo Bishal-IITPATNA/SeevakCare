@@ -29,6 +29,7 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
   const [mode, setMode]           = useState<"full" | "emi">("full");
   const [tenure, setTenure]       = useState<EmiTenure>(3);
   const [loading, setLoading]     = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const emi = calculateEmi(amount, tenure);
 
@@ -65,6 +66,11 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         image:       "/logo.jpg",
         theme:       { color: "#0284c7" },
         prefill:     {},
+        notes: {
+          merchant_legal_entity: "RADIUS CARE WELL INDIA PRIVATE LIMITED",
+          terms_url: "/terms-and-conditions",
+          refund_url: "/refund-policy",
+        },
         handler: async (response: any) => {
           const verifyRes = await fetch("/api/payments/verify", {
             method:  "POST",
@@ -119,10 +125,31 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         </button>
       </div>
 
+      {/* T&C acceptance — required by Razorpay guidelines */}
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={termsAccepted}
+          onChange={(e) => setTermsAccepted(e.target.checked)}
+          className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 shrink-0"
+        />
+        <span className="text-xs text-slate-500 leading-relaxed">
+          I agree to the{" "}
+          <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+            Terms &amp; Conditions
+          </a>{" "}
+          and{" "}
+          <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+            Refund Policy
+          </a>{" "}
+          of Seevak Care (Radius Care Well India Pvt Ltd)
+        </span>
+      </label>
+
       {mode === "full" && (
         <button
           onClick={() => pay(false)}
-          disabled={loading}
+          disabled={loading || !termsAccepted}
           className="w-full btn-primary py-2.5 flex items-center justify-center gap-2"
         >
           {loading ? "Processing…" : `💳 Pay ₹${amount.toFixed(2)} Now`}
@@ -177,8 +204,8 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
 
           <button
             onClick={() => pay(true)}
-            disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
+            disabled={loading || !termsAccepted}
+            className="w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
           >
             {loading ? "Processing…" : `📅 Pay 1st Instalment ₹${emi.monthlyEmi.toFixed(2)}`}
           </button>

@@ -88,20 +88,54 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-white py-10 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.jpg" alt="Seevak Care" width={36} height={36} className="rounded-lg object-contain" />
-            <div>
-              <span className="font-bold text-sky-700">Seevak Care</span>
-              <p className="text-xs text-green-600 font-medium leading-none">Seeva Hamari, Suraksha Apki</p>
+      <footer className="border-t bg-white py-12 px-4">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Top row */}
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+            {/* Brand */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Image src="/logo.jpg" alt="Seevak Care" width={36} height={36} className="rounded-lg object-contain" />
+                <div>
+                  <span className="font-bold text-sky-700">Seevak Care</span>
+                  <p className="text-xs text-green-600 font-medium leading-none">Seeva Hamari, Suraksha Apki</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">RADIUS CARE WELL INDIA PRIVATE LIMITED</p>
+              <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                1448, Chunabhatti, Naka N8 Ward No 14,<br />Darbhanga-846009, Bihar, India
+              </p>
+            </div>
+
+            {/* Policy links */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-2">
+              {[
+                { href: "/about-us",             label: "About Us" },
+                { href: "/contact-us",           label: "Contact Us" },
+                { href: "/privacy-policy",       label: "Privacy Policy" },
+                { href: "/terms-and-conditions", label: "Terms & Conditions" },
+                { href: "/refund-policy",        label: "Refund Policy" },
+              ].map((l) => (
+                <Link key={l.href} href={l.href} className="text-sm text-slate-600 hover:text-sky-700 transition-colors">
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+
+            {/* Contact */}
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-slate-700 text-xs">Support</p>
+              <a href="mailto:seevakcare@gmail.com" className="block text-sky-600 hover:underline text-sm">seevakcare@gmail.com</a>
+              <a href="tel:+919771365160"           className="block text-sky-600 hover:underline text-sm">+91 9771365160</a>
+              <p className="text-xs text-slate-400">Mon–Sat, 9 AM – 6 PM IST</p>
             </div>
           </div>
-          <p className="text-slate-400 text-sm">
-            Support: <a href="mailto:seevakcare@gmail.com" className="text-sky-600">seevakcare@gmail.com</a> ·{" "}
-            <a href="tel:+919771365160" className="text-sky-600">+91 97713 65160</a>
-          </p>
-          <p className="text-slate-400 text-sm">© {new Date().getFullYear()} Seevak Care</p>
+
+          {/* Bottom row */}
+          <div className="border-t border-slate-100 pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+            <p>© {new Date().getFullYear()} Seevak Care · Radius Care Well India Private Limited · All rights reserved</p>
+            <p>Payments secured by <span className="font-semibold text-slate-500">Razorpay</span></p>
+          </div>
         </div>
       </footer>
     </div>
