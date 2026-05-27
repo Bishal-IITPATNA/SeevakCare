@@ -42,9 +42,9 @@ export default function TermsPage() {
           <strong>Last Updated:</strong> 27 May 2026
         </p>
         <p className="text-slate-600 text-sm mt-3 leading-relaxed">
-          These Terms &amp; Conditions ("Terms") govern your access to and use of the Seevak Care
+          These Terms &amp; Conditions (&quot;Terms&quot;) govern your access to and use of the Seevak Care
           platform, operated by <strong>Radius Care Well India Private Limited</strong>
-          {" "}("Company", "we", "our", or "us"). By registering or using Seevak Care, you agree to
+          {" "}(&quot;Company&quot;, &quot;we&quot;, &quot;our&quot;, or &quot;us&quot;). By registering or using Seevak Care, you agree to
           be bound by these Terms. If you disagree with any part, you must discontinue use immediately.
         </p>
       </div>

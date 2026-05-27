@@ -41,7 +41,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <p className="text-slate-600 text-sm mt-3 leading-relaxed">
           This Privacy Policy describes how <strong>Radius Care Well India Private Limited</strong>
-          {" "}(trading as <strong>Seevak Care</strong>, "we", "our", or "us") collects, uses, and
+          {" "}(trading as <strong>Seevak Care</strong>, &quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) collects, uses, and
           protects your personal information when you use our platform and services. Please read this
           policy carefully before using Seevak Care.
         </p>
