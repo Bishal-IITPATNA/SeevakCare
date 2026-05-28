@@ -30,6 +30,7 @@ enum AppointmentStatus {
   DECLINED
   COMPLETED
   CANCELLED
+  SLOT_PROPOSED
 }
 
 enum OrderStatus {
@@ -274,12 +275,14 @@ model Appointment {
   departmentId    String?
   appointmentDate DateTime
   slotTime        String
-  status          AppointmentStatus @default(PENDING)
-  notes           String?
-  reason          String?
-  consultationFee Decimal?          @db.Decimal(10, 2)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  status           AppointmentStatus @default(PENDING)
+  notes            String?
+  reason           String?
+  consultationFee  Decimal?          @db.Decimal(10, 2)
+  proposedDate     DateTime?         // Admin-proposed alternative date
+  proposedSlotTime String?           // Admin-proposed alternative time
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   patient      Patient      @relation(fields: [patientId], references: [id])
   doctor       Doctor?      @relation(fields: [doctorId], references: [id])

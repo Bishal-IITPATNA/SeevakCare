@@ -46,6 +46,7 @@ export default function PatientDashboard() {
   const [hBooking, setHBooking]           = useState({ departmentId: "", appointmentDate: "", slotTime: "", reason: "" });
   const [hBookingMsg, setHBookingMsg]     = useState("");
   const [hospitalSortByRating, setHospitalSortByRating] = useState(false);
+  const [bookedHospitalSupport, setBookedHospitalSupport] = useState<{ name: string; phone: string; email: string } | null>(null);
 
   // Hospital services + T&C state
   const [hServices, setHServices]         = useState<any[]>([]);
@@ -178,9 +179,17 @@ export default function PatientDashboard() {
       }),
     });
     if (res.ok) {
-      setHBookingMsg("Appointment booked! Check the Appointments tab.");
+      // Capture support info before clearing hospital state
+      setBookedHospitalSupport({
+        name:  selectedHospital.name,
+        phone: selectedHospital.phone ?? "",
+        email: selectedHospital.email ?? "",
+      });
       setSelectedHospital(null);
       setHBooking({ departmentId: "", appointmentDate: "", slotTime: "", reason: "" });
+      setHBookingStep("services");
+      setSelectedService(null);
+      setHTcAccepted(false);
       const fresh = await fetch("/api/appointments").then(r => r.json());
       setAppointments(Array.isArray(fresh) ? fresh : []);
     } else {
@@ -188,6 +197,10 @@ export default function PatientDashboard() {
       setHBookingMsg(d.error ?? "Booking failed");
     }
     setHBookingSubmitting(false);
+  }
+
+  function refreshAppointments() {
+    fetch("/api/appointments").then(r => r.json()).then(d => setAppointments(Array.isArray(d) ? d : []));
   }
 
   function addToCart(med: any) {
@@ -263,7 +276,7 @@ export default function PatientDashboard() {
                 <h2 className="font-semibold text-slate-700 mb-4">Recent Appointments</h2>
                 {appointments.length === 0
                   ? <p className="text-slate-400 text-sm">No appointments yet. <button onClick={() => setTab("book-doctor")} className="text-sky-600 underline">Book one now →</button></p>
-                  : <div className="grid gap-3">{appointments.slice(0, 3).map(a => <AppointmentCard key={a.id} appointment={a} />)}</div>
+                  : <div className="grid gap-3">{appointments.slice(0, 3).map(a => <AppointmentCard key={a.id} appointment={a} onStatusChange={refreshAppointments} />)}</div>
                 }
               </section>
             </>
@@ -273,7 +286,7 @@ export default function PatientDashboard() {
             <div className="grid gap-3">
               {appointments.length === 0
                 ? <p className="text-slate-400 text-sm">No appointments. <button onClick={() => setTab("book-doctor")} className="text-sky-600 underline">Book one →</button></p>
-                : appointments.map(a => <AppointmentCard key={a.id} appointment={a} />)
+                : appointments.map(a => <AppointmentCard key={a.id} appointment={a} onStatusChange={refreshAppointments} />)
               }
             </div>
           )}
@@ -411,6 +424,45 @@ export default function PatientDashboard() {
           {/* Hospital search & booking */}
           {tab === "hospitals" && (
             <div>
+              {/* Post-booking success card with support contact */}
+              {bookedHospitalSupport && (
+                <div className="card bg-green-50 border-green-200 mb-6 space-y-3">
+                  <div className="text-3xl">✅</div>
+                  <h3 className="font-bold text-green-800 text-lg">Appointment Request Sent!</h3>
+                  <p className="text-sm text-green-700">
+                    Your booking at <strong>{bookedHospitalSupport.name}</strong> has been submitted.
+                    The hospital will review and confirm your slot (or suggest a new one).
+                  </p>
+                  <div className="bg-white border border-green-200 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-semibold text-slate-600 uppercase">For faster approval, contact the hospital directly:</p>
+                    {bookedHospitalSupport.phone && (
+                      <a
+                        href={`tel:${bookedHospitalSupport.phone}`}
+                        className="flex items-center gap-2 text-sm text-sky-700 font-medium hover:underline"
+                      >
+                        📞 {bookedHospitalSupport.phone}
+                      </a>
+                    )}
+                    {bookedHospitalSupport.email && (
+                      <a
+                        href={`mailto:${bookedHospitalSupport.email}`}
+                        className="flex items-center gap-2 text-sm text-sky-700 font-medium hover:underline"
+                      >
+                        ✉️ {bookedHospitalSupport.email}
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setBookedHospitalSupport(null); setTab("appointments"); }} className="btn-primary text-sm">
+                      View My Appointments →
+                    </button>
+                    <button onClick={() => setBookedHospitalSupport(null)} className="btn-secondary text-sm">
+                      Book Another
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!selectedHospital ? (
                 <>
                   <div className="flex gap-2 mb-4 flex-wrap">
@@ -714,7 +766,14 @@ export default function PatientDashboard() {
                                   </label>
 
                                   <button
-                                    onClick={e => { e.stopPropagation(); setHBookingStep("form"); }}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      setHBookingStep("form");
+                                      // Auto-select department from the chosen service
+                                      if (selectedService?.departmentId) {
+                                        setHBooking(b => ({ ...b, departmentId: selectedService.departmentId }));
+                                      }
+                                    }}
                                     disabled={!hTcAccepted}
                                     className="w-full btn-primary py-2.5 disabled:opacity-50"
                                   >

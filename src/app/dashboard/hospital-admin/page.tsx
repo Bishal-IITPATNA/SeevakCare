@@ -123,11 +123,12 @@ function ServiceForm({ form, setForm, departments, msg, onSubmit, submitLabel, c
 }
 
 const APPT_BADGE: Record<string, string> = {
-  PENDING:   "badge bg-yellow-50 text-yellow-700",
-  ACCEPTED:  "badge bg-green-50 text-green-700",
-  DECLINED:  "badge bg-red-50 text-red-600",
-  COMPLETED: "badge bg-slate-100 text-slate-500",
-  CANCELLED: "badge bg-slate-100 text-slate-400",
+  PENDING:       "badge bg-yellow-50 text-yellow-700",
+  ACCEPTED:      "badge bg-green-50 text-green-700",
+  DECLINED:      "badge bg-red-50 text-red-600",
+  COMPLETED:     "badge bg-slate-100 text-slate-500",
+  CANCELLED:     "badge bg-slate-100 text-slate-400",
+  SLOT_PROPOSED: "badge bg-purple-50 text-purple-700",
 };
 
 const NAV = [
@@ -179,6 +180,11 @@ export default function HospitalAdminDashboard() {
   const [doctorSearch, setDoctorSearch]   = useState<Record<string, string>>({});
   const [doctorResults, setDoctorResults] = useState<Record<string, any[]>>({});
   const [assignMsg, setAssignMsg]         = useState<Record<string, string>>({});
+
+  // Slot proposal
+  const [proposingFor, setProposingFor]     = useState<string | null>(null); // appointment id
+  const [proposalForm, setProposalForm]     = useState({ date: "", time: "", note: "" });
+  const [proposalMsg, setProposalMsg]       = useState("");
 
   // Password change
   const [pwdForm, setPwdForm]   = useState({ currentPassword: "", newPassword: "" });
@@ -324,7 +330,35 @@ export default function HospitalAdminDashboard() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    if (res.ok) setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    if (res.ok) {
+      const updated = await res.json();
+      setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: updated.status } : a));
+    }
+  }
+
+  async function proposeSlot(id: string) {
+    setProposalMsg("");
+    if (!proposalForm.date || !proposalForm.time) {
+      setProposalMsg("Please enter both a date and time."); return;
+    }
+    const res = await fetch(`/api/appointments/${id}/status`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status:          "SLOT_PROPOSED",
+        proposedDate:    proposalForm.date,
+        proposedSlotTime: proposalForm.time,
+        notes:           proposalForm.note || undefined,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: updated.status } : a));
+      setProposingFor(null);
+      setProposalForm({ date: "", time: "", note: "" });
+    } else {
+      const d = await res.json();
+      setProposalMsg(d.error ?? "Failed to propose slot.");
+    }
   }
 
   // ── Services ───────────────────────────────────────────────────────────────
@@ -770,27 +804,105 @@ export default function HospitalAdminDashboard() {
               <h1 className="text-2xl font-bold text-slate-800">Appointments</h1>
               {appointments.length === 0 && <p className="text-slate-400 text-sm">No appointments yet.</p>}
               {appointments.map((a: any) => (
-                <div key={a.id} className="card">
+                <div key={a.id} className="card space-y-3">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={APPT_BADGE[a.status] ?? "badge"}>{a.status}</span>
-                        <span className="text-xs text-slate-400">{new Date(a.appointmentDate).toDateString()} @ {a.slotTime}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={APPT_BADGE[a.status] ?? "badge"}>
+                          {a.status === "SLOT_PROPOSED" ? "🔄 Slot Proposed" : a.status}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {new Date(a.appointmentDate).toDateString()} @ {a.slotTime}
+                        </span>
                       </div>
                       <p className="font-semibold text-slate-800">{a.patient?.user?.name}</p>
                       <p className="text-sm text-slate-500">{a.department?.name ?? "General"}</p>
                       {a.reason && <p className="text-xs text-slate-400 mt-0.5">{a.reason}</p>}
+                      {a.consultationFee && Number(a.consultationFee) > 0 && (
+                        <p className="text-xs text-sky-600 mt-0.5 font-medium">
+                          Fee: ₹{Number(a.consultationFee).toLocaleString("en-IN")}
+                          {a.payment?.status === "SUCCESS" && <span className="ml-1 text-green-600">✅ Paid</span>}
+                        </p>
+                      )}
+                      {/* Show what slot was proposed */}
+                      {a.status === "SLOT_PROPOSED" && a.proposedDate && (
+                        <p className="text-xs text-purple-600 mt-1">
+                          Proposed: {new Date(a.proposedDate).toDateString()} @ {a.proposedSlotTime}
+                          {a.notes && ` — "${a.notes}"`}
+                        </p>
+                      )}
                     </div>
-                    {a.status === "PENDING" && (
-                      <div className="flex flex-col gap-1.5 shrink-0">
-                        <button onClick={() => updateApptStatus(a.id, "ACCEPTED")} className="btn-success text-xs">✓ Accept</button>
-                        <button onClick={() => updateApptStatus(a.id, "DECLINED")} className="text-xs border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg">✕ Decline</button>
-                      </div>
-                    )}
-                    {a.status === "ACCEPTED" && (
-                      <button onClick={() => updateApptStatus(a.id, "COMPLETED")} className="btn-secondary text-xs shrink-0">Mark Completed</button>
-                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                      {a.status === "PENDING" && (
+                        <>
+                          <button
+                            onClick={() => updateApptStatus(a.id, "ACCEPTED")}
+                            className="btn-success text-xs"
+                          >✓ Accept</button>
+                          <button
+                            onClick={() => { setProposingFor(a.id); setProposalForm({ date: "", time: "", note: "" }); setProposalMsg(""); }}
+                            className="text-xs bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 px-3 py-1 rounded-lg"
+                          >🔄 Propose Slot</button>
+                          <button
+                            onClick={() => updateApptStatus(a.id, "DECLINED")}
+                            className="text-xs border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg"
+                          >✕ Decline</button>
+                        </>
+                      )}
+                      {a.status === "SLOT_PROPOSED" && (
+                        <span className="text-xs text-purple-600 text-right">
+                          Awaiting<br />patient response
+                        </span>
+                      )}
+                      {a.status === "ACCEPTED" && (
+                        <button
+                          onClick={() => updateApptStatus(a.id, "COMPLETED")}
+                          className="btn-secondary text-xs"
+                        >Mark Completed</button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Inline propose-slot form */}
+                  {proposingFor === a.id && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                      <p className="text-xs font-semibold text-purple-700">Propose a different date &amp; time</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          min={new Date().toISOString().slice(0, 10)}
+                          value={proposalForm.date}
+                          onChange={e => setProposalForm(f => ({ ...f, date: e.target.value }))}
+                          className="input text-sm flex-1"
+                        />
+                        <input
+                          type="time"
+                          value={proposalForm.time}
+                          onChange={e => setProposalForm(f => ({ ...f, time: e.target.value }))}
+                          className="input text-sm w-32"
+                        />
+                      </div>
+                      <input
+                        placeholder="Reason / note to patient (optional)"
+                        value={proposalForm.note}
+                        onChange={e => setProposalForm(f => ({ ...f, note: e.target.value }))}
+                        className="input text-sm"
+                      />
+                      {proposalMsg && <p className="text-xs text-red-500">{proposalMsg}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => proposeSlot(a.id)}
+                          className="btn-primary text-xs"
+                        >Send Proposal</button>
+                        <button
+                          onClick={() => setProposingFor(null)}
+                          className="btn-secondary text-xs"
+                        >Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
