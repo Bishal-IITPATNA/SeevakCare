@@ -153,6 +153,7 @@ model Patient {
   labBookings           LabBooking[]
   prescriptionUploads   PrescriptionUpload[]
   reviews               Review[]
+  prescriptionBills     PrescriptionBill[]
 }
 
 // ───────────────────────────────────────────
@@ -312,6 +313,7 @@ model Prescription {
   patient     Patient              @relation(fields: [patientId], references: [id])
   medicines   PrescribedMedicine[]
   labTests    PrescribedLabTest[]
+  bill        PrescriptionBill?
 }
 
 model PrescribedMedicine {
@@ -577,6 +579,39 @@ model Review {
 
   @@unique([patientId, doctorId])
   @@unique([patientId, hospitalId])
+}
+
+// ───────────────────────────────────────────
+// PRESCRIPTION BILLS (admin-generated)
+// ───────────────────────────────────────────
+
+model PrescriptionBill {
+  id             String   @id @default(cuid())
+  prescriptionId String   @unique
+  patientId      String
+  subtotal       Decimal  @db.Decimal(10, 2)
+  gstAmount      Decimal  @db.Decimal(10, 2)
+  deliveryCharge Decimal  @db.Decimal(10, 2)
+  totalAmount    Decimal  @db.Decimal(10, 2)
+  otpCode        String?
+  otpVerified    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  prescription Prescription          @relation(fields: [prescriptionId], references: [id])
+  patient      Patient               @relation(fields: [patientId], references: [id])
+  items        PrescriptionBillItem[]
+}
+
+model PrescriptionBillItem {
+  id           String  @id @default(cuid())
+  billId       String
+  medicineName String
+  quantity     Int
+  unitPrice    Decimal @db.Decimal(10, 2)
+  totalPrice   Decimal @db.Decimal(10, 2)
+
+  bill PrescriptionBill @relation(fields: [billId], references: [id])
 }
 
 // ───────────────────────────────────────────

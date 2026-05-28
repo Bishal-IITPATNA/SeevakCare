@@ -17,6 +17,7 @@ const PROTECTED_PREFIXES = [
   "/api/patients",
   "/api/doctors/profile",
   "/api/doctors/chambers",
+  "/api/prescription-bills",
 ];
 
 export function middleware(req: NextRequest) {

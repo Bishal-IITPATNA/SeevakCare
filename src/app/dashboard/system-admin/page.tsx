@@ -38,6 +38,24 @@ export default function SystemAdminDashboard() {
   const [rejectForms, setRejectForms]         = useState<Record<string, string>>({});
   const [rejectSubmitting, setRejectSubmitting] = useState<Record<string, boolean>>({});
 
+  // Admin bookings (appointments + lab bookings)
+  const [adminAppts, setAdminAppts]           = useState<any[]>([]);
+  const [adminLabs, setAdminLabs]             = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [apptActing, setApptActing]           = useState<Record<string, boolean>>({});
+  const [apptMsg, setApptMsg]                 = useState<Record<string, string>>({});
+  const [proposeForm, setProposeForm]         = useState<Record<string, { date: string; time: string }>>({});
+  const [showPropose, setShowPropose]         = useState<Record<string, boolean>>({});
+
+  // Admin doctor-prescriptions + bills
+  const [adminPrescs, setAdminPrescs]         = useState<any[]>([]);
+  const [prescsLoading, setPrescsLoading]     = useState(false);
+  const [billForms, setBillForms]             = useState<Record<string, {
+    items: { medicineName: string; quantity: number; unitPrice: number }[];
+  }>>({});
+  const [billCreating, setBillCreating]       = useState<Record<string, boolean>>({});
+  const [billMsg, setBillMsg]                 = useState<Record<string, string>>({});
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
       if (!r.ok) { router.push("/login"); return null; }
@@ -61,6 +79,8 @@ export default function SystemAdminDashboard() {
 
   useEffect(() => {
     if (tab === "prescriptions") fetchPrescUploads();
+    if (tab === "bookings")      fetchAdminBookings();
+    if (tab === "doctor-prescriptions") fetchAdminPrescs();
   }, [tab]);
 
   function getOrderForm(id: string) {
@@ -133,6 +153,120 @@ export default function SystemAdminDashboard() {
     }
   }
 
+  async function fetchAdminBookings() {
+    setBookingsLoading(true);
+    try {
+      const [appts, labs] = await Promise.all([
+        fetch("/api/admin/appointments").then(r => r.json()),
+        fetch("/api/admin/lab-bookings").then(r => r.json()),
+      ]);
+      setAdminAppts(Array.isArray(appts) ? appts : []);
+      setAdminLabs(Array.isArray(labs)   ? labs   : []);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }
+
+  async function fetchAdminPrescs() {
+    setPrescsLoading(true);
+    try {
+      const data = await fetch("/api/admin/prescriptions").then(r => r.json());
+      const prescs = Array.isArray(data) ? data : [];
+      setAdminPrescs(prescs);
+      // Pre-populate bill forms from prescription medicines (for ones without a bill)
+      const forms: Record<string, { items: { medicineName: string; quantity: number; unitPrice: number }[] }> = {};
+      prescs.forEach((p: any) => {
+        if (!p.bill && p.medicines?.length) {
+          forms[p.id] = {
+            items: p.medicines.map((m: any) => ({
+              medicineName: m.medicineName,
+              quantity:     1,
+              unitPrice:    0,
+            })),
+          };
+        }
+      });
+      setBillForms(prev => ({ ...forms, ...prev }));
+    } finally {
+      setPrescsLoading(false);
+    }
+  }
+
+  async function actOnAppointment(id: string, status: string, extra?: { proposedDate?: string; proposedSlotTime?: string }) {
+    setApptActing(a => ({ ...a, [id]: true }));
+    setApptMsg(m => ({ ...m, [id]: "" }));
+    try {
+      const res = await fetch(`/api/appointments/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, ...extra }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setApptMsg(m => ({ ...m, [id]: d.error ?? "Action failed" }));
+        return;
+      }
+      setShowPropose(s => ({ ...s, [id]: false }));
+      await fetchAdminBookings();
+    } finally {
+      setApptActing(a => ({ ...a, [id]: false }));
+    }
+  }
+
+  function getBillForm(id: string) {
+    return billForms[id] ?? { items: [] };
+  }
+
+  function addBillItem(prescId: string) {
+    setBillForms(f => {
+      const form = f[prescId] ?? { items: [] };
+      return { ...f, [prescId]: { items: [...form.items, { medicineName: "", quantity: 1, unitPrice: 0 }] } };
+    });
+  }
+
+  function updateBillItem(prescId: string, idx: number, field: string, value: any) {
+    setBillForms(f => {
+      const form = { ...f[prescId] };
+      const items = [...form.items];
+      items[idx] = { ...items[idx], [field]: value };
+      return { ...f, [prescId]: { ...form, items } };
+    });
+  }
+
+  function removeBillItem(prescId: string, idx: number) {
+    setBillForms(f => {
+      const form = { ...f[prescId] };
+      return { ...f, [prescId]: { items: form.items.filter((_: any, i: number) => i !== idx) } };
+    });
+  }
+
+  async function generateBill(prescId: string) {
+    if (billCreating[prescId]) return;
+    const form = getBillForm(prescId);
+    if (!form.items.length) {
+      setBillMsg(m => ({ ...m, [prescId]: "Add at least one medicine item" })); return;
+    }
+    const invalid = form.items.find((i: any) => !i.medicineName || i.unitPrice <= 0 || i.quantity < 1);
+    if (invalid) {
+      setBillMsg(m => ({ ...m, [prescId]: "Fill all fields: medicine name, quantity (≥1), and unit price (>0)" })); return;
+    }
+    setBillCreating(c => ({ ...c, [prescId]: true }));
+    setBillMsg(m => ({ ...m, [prescId]: "" }));
+    try {
+      const res = await fetch(`/api/admin/prescriptions/${prescId}/bill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: form.items }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setBillMsg(m => ({ ...m, [prescId]: data.error ?? "Failed to generate bill" })); return; }
+      setBillMsg(m => ({ ...m, [prescId]: `Bill generated! OTP: ${data.otpCode}` }));
+      await fetchAdminPrescs();
+    } finally {
+      setBillCreating(c => ({ ...c, [prescId]: false }));
+    }
+  }
+
   async function approveOrder(id: string) {
     await fetch(`/api/medicine-orders/${id}/approve`, { method: "POST" });
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: "PAYMENT_PENDING" } : o));
@@ -173,12 +307,16 @@ export default function SystemAdminDashboard() {
 
   const pendingPrescriptions = prescUploads.filter(u => u.status === "PENDING");
 
+  const pendingHospitalAppts = adminAppts.filter(a => a.hospitalId && a.status === "PENDING");
+
   const NAV = [
-    { id: "overview",       label: "Overview",                                           icon: "📊" },
-    { id: "approvals",      label: `Approvals (${pendingApproval.length})`,              icon: "✅" },
-    { id: "dispatch",       label: `Dispatch (${paid.length + dispatched.length})`,      icon: "🚚" },
-    { id: "all-orders",     label: "All Orders",                                         icon: "📦" },
-    { id: "prescriptions",  label: `Prescriptions${pendingPrescriptions.length ? ` (${pendingPrescriptions.length})` : ""}`, icon: "📄" },
+    { id: "overview",              label: "Overview",                                                   icon: "📊" },
+    { id: "bookings",              label: `Bookings${pendingHospitalAppts.length ? ` (${pendingHospitalAppts.length})` : ""}`, icon: "📅" },
+    { id: "approvals",             label: `Orders (${pendingApproval.length})`,                         icon: "✅" },
+    { id: "dispatch",              label: `Dispatch (${paid.length + dispatched.length})`,               icon: "🚚" },
+    { id: "all-orders",            label: "All Orders",                                                 icon: "📦" },
+    { id: "prescriptions",         label: `Rx Uploads${pendingPrescriptions.length ? ` (${pendingPrescriptions.length})` : ""}`, icon: "📄" },
+    { id: "doctor-prescriptions",  label: "Rx & Bills",                                                 icon: "🧾" },
   ];
 
   const stats = analytics ? [
@@ -598,6 +736,375 @@ export default function SystemAdminDashboard() {
 
                     {isRejected && u.adminNote && (
                       <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">Rejection note: {u.adminNote}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {/* ── All Bookings Tab ─────────────────────────────────────── */}
+          {tab === "bookings" && (
+            <div className="space-y-8">
+              {bookingsLoading && <p className="text-sm text-slate-400">Loading bookings…</p>}
+
+              {/* Hospital Appointments */}
+              {!bookingsLoading && (
+                <section>
+                  <h2 className="font-semibold text-slate-700 mb-3">
+                    Hospital Appointments
+                    {pendingHospitalAppts.length > 0 && (
+                      <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                        {pendingHospitalAppts.length} pending
+                      </span>
+                    )}
+                  </h2>
+                  <div className="space-y-3">
+                    {adminAppts.filter(a => a.hospitalId).length === 0 && (
+                      <p className="text-sm text-slate-400">No hospital appointments yet.</p>
+                    )}
+                    {adminAppts.filter(a => a.hospitalId).map(appt => {
+                      const isPending   = appt.status === "PENDING";
+                      const isAccepted  = appt.status === "ACCEPTED";
+                      const propForm    = proposeForm[appt.id] ?? { date: "", time: "" };
+                      const statusColor: Record<string, string> = {
+                        PENDING:       "bg-yellow-50 text-yellow-700",
+                        ACCEPTED:      "bg-green-50 text-green-700",
+                        DECLINED:      "bg-red-50 text-red-600",
+                        COMPLETED:     "bg-slate-100 text-slate-500",
+                        CANCELLED:     "bg-slate-100 text-slate-400",
+                        SLOT_PROPOSED: "bg-blue-50 text-blue-700",
+                      };
+                      return (
+                        <div key={appt.id} className="card">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className={`badge ${statusColor[appt.status] ?? "bg-slate-100 text-slate-500"}`}>
+                                  {appt.status.replace("_", " ")}
+                                </span>
+                                <span className="text-xs text-slate-400">{new Date(appt.appointmentDate).toDateString()} at {appt.slotTime}</span>
+                              </div>
+                              <p className="font-semibold text-slate-800">{appt.patient?.user?.name}</p>
+                              <p className="text-xs text-slate-400">{appt.patient?.user?.phone} · {appt.patient?.user?.email}</p>
+                              <p className="text-xs text-sky-700 mt-0.5">{appt.hospital?.name}{appt.department ? ` · ${appt.department.name}` : ""}</p>
+                              {appt.reason && <p className="text-xs text-slate-500 mt-0.5">Reason: {appt.reason}</p>}
+                              {appt.consultationFee && (
+                                <p className="text-xs text-slate-500">Fee: ₹{Number(appt.consultationFee).toLocaleString("en-IN")}</p>
+                              )}
+                              {appt.status === "SLOT_PROPOSED" && appt.proposedDate && (
+                                <p className="text-xs text-blue-600 mt-1">
+                                  Proposed: {new Date(appt.proposedDate).toDateString()} at {appt.proposedSlotTime}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex flex-col gap-2 shrink-0">
+                              {isPending && (
+                                <div className="flex gap-2 flex-wrap">
+                                  <button
+                                    onClick={() => actOnAppointment(appt.id, "ACCEPTED")}
+                                    disabled={apptActing[appt.id]}
+                                    className="btn-primary text-xs py-1.5 px-3"
+                                  >✅ Accept</button>
+                                  <button
+                                    onClick={() => actOnAppointment(appt.id, "DECLINED")}
+                                    disabled={apptActing[appt.id]}
+                                    className="px-3 py-1.5 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium"
+                                  >❌ Decline</button>
+                                  <button
+                                    onClick={() => setShowPropose(s => ({ ...s, [appt.id]: !s[appt.id] }))}
+                                    className="px-3 py-1.5 text-xs rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium"
+                                  >📅 Propose Slot</button>
+                                </div>
+                              )}
+                              {isAccepted && (
+                                <button
+                                  onClick={() => actOnAppointment(appt.id, "COMPLETED")}
+                                  disabled={apptActing[appt.id]}
+                                  className="btn-primary text-xs py-1.5 px-3"
+                                >🏁 Mark Complete</button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Propose slot inline form */}
+                          {showPropose[appt.id] && (
+                            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex flex-wrap gap-3 items-end">
+                              <div>
+                                <p className="text-xs font-medium text-blue-700 mb-1">New Date</p>
+                                <input
+                                  type="date"
+                                  min={new Date().toISOString().slice(0, 10)}
+                                  value={propForm.date}
+                                  onChange={e => setProposeForm(f => ({ ...f, [appt.id]: { ...propForm, date: e.target.value } }))}
+                                  className="input text-sm w-40"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-blue-700 mb-1">New Time</p>
+                                <input
+                                  type="time"
+                                  value={propForm.time}
+                                  onChange={e => setProposeForm(f => ({ ...f, [appt.id]: { ...propForm, time: e.target.value } }))}
+                                  className="input text-sm w-32"
+                                />
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (!propForm.date || !propForm.time) return;
+                                  actOnAppointment(appt.id, "SLOT_PROPOSED", {
+                                    proposedDate:     propForm.date,
+                                    proposedSlotTime: propForm.time,
+                                  });
+                                }}
+                                disabled={apptActing[appt.id] || !propForm.date || !propForm.time}
+                                className="btn-primary text-xs py-2 px-4 self-end"
+                              >Send Proposal</button>
+                            </div>
+                          )}
+
+                          {apptMsg[appt.id] && (
+                            <p className="text-xs text-red-500 mt-2">{apptMsg[appt.id]}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* Doctor Appointments */}
+              {!bookingsLoading && (
+                <section>
+                  <h2 className="font-semibold text-slate-700 mb-3">Doctor Appointments</h2>
+                  <div className="space-y-2">
+                    {adminAppts.filter(a => a.doctorId).length === 0 && (
+                      <p className="text-sm text-slate-400">No doctor appointments yet.</p>
+                    )}
+                    {adminAppts.filter(a => a.doctorId).map(appt => {
+                      const statusColor: Record<string, string> = {
+                        PENDING:       "bg-yellow-50 text-yellow-700",
+                        ACCEPTED:      "bg-green-50 text-green-700",
+                        DECLINED:      "bg-red-50 text-red-600",
+                        COMPLETED:     "bg-slate-100 text-slate-500",
+                        CANCELLED:     "bg-slate-100 text-slate-400",
+                        SLOT_PROPOSED: "bg-blue-50 text-blue-700",
+                      };
+                      return (
+                        <div key={appt.id} className="card flex items-center justify-between gap-3 flex-wrap py-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`badge ${statusColor[appt.status] ?? "bg-slate-100 text-slate-500"}`}>
+                                {appt.status.replace("_", " ")}
+                              </span>
+                              <span className="text-sm font-medium text-slate-800">{appt.patient?.user?.name}</span>
+                              <span className="text-xs text-slate-400">→ Dr. {appt.doctor?.user?.name}</span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {new Date(appt.appointmentDate).toDateString()} at {appt.slotTime}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* Lab Bookings */}
+              {!bookingsLoading && (
+                <section>
+                  <h2 className="font-semibold text-slate-700 mb-3">Lab Bookings</h2>
+                  <div className="space-y-2">
+                    {adminLabs.length === 0 && (
+                      <p className="text-sm text-slate-400">No lab bookings yet.</p>
+                    )}
+                    {adminLabs.map(lb => {
+                      const statusColor: Record<string, string> = {
+                        PENDING:          "bg-yellow-50 text-yellow-700",
+                        CONFIRMED:        "bg-green-50 text-green-700",
+                        SAMPLE_COLLECTED: "bg-blue-50 text-blue-700",
+                        REPORT_UPLOADED:  "bg-purple-50 text-purple-700",
+                        CANCELLED:        "bg-slate-100 text-slate-400",
+                      };
+                      return (
+                        <div key={lb.id} className="card py-3">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`badge ${statusColor[lb.status] ?? "bg-slate-100 text-slate-500"}`}>
+                              {lb.status.replace("_", " ")}
+                            </span>
+                            <span className="text-xs text-slate-400">{lb.collectionType === "HOME" ? "🏠 Home" : "🏥 Lab"}</span>
+                          </div>
+                          <p className="text-sm font-medium text-slate-800">{lb.patient?.user?.name}</p>
+                          <p className="text-xs text-slate-500">{lb.labTest?.name} · {lb.labStore?.name}</p>
+                          <p className="text-xs text-slate-400">
+                            Scheduled: {new Date(lb.scheduledDate).toDateString()}
+                            {lb.collectionAddress && ` · ${lb.collectionAddress}`}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+
+          {/* ── Doctor Prescriptions & Bill Generation ───────────────── */}
+          {tab === "doctor-prescriptions" && (
+            <div className="space-y-4">
+              {prescsLoading && <p className="text-sm text-slate-400">Loading prescriptions…</p>}
+              {!prescsLoading && adminPrescs.length === 0 && (
+                <p className="text-sm text-slate-400">No doctor prescriptions yet.</p>
+              )}
+              {adminPrescs.map(presc => {
+                const hasBill  = !!presc.bill;
+                const form     = getBillForm(presc.id);
+                const billSub  = form.items.reduce((s: number, i: any) => s + (i.quantity * i.unitPrice), 0);
+                const billGst  = parseFloat((billSub * 0.05).toFixed(2));
+                const billDel  = billSub < 500 ? 50 : parseFloat((billSub * 0.1).toFixed(2));
+                const billTot  = parseFloat((billSub + billGst + billDel).toFixed(2));
+
+                return (
+                  <div key={presc.id} className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="font-semibold text-slate-800">{presc.patient?.user?.name}</p>
+                        <p className="text-xs text-slate-400">{presc.patient?.user?.email}</p>
+                        <p className="text-xs text-sky-600 mt-0.5">Dr. {presc.doctor?.user?.name} · {new Date(presc.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        <p className="text-sm text-slate-700 font-medium mt-1">{presc.diagnosis}</p>
+                        {presc.notes && <p className="text-xs text-slate-500 italic">{presc.notes}</p>}
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                        hasBill ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {hasBill ? "✅ Bill Generated" : "⏳ No Bill Yet"}
+                      </span>
+                    </div>
+
+                    {/* Prescribed medicines from doctor */}
+                    {presc.medicines?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Prescribed Medicines</p>
+                        <div className="space-y-1">
+                          {presc.medicines.map((m: any) => (
+                            <div key={m.id} className="text-xs text-slate-600 bg-slate-50 rounded px-3 py-1.5">
+                              <span className="font-medium">{m.medicineName}</span>
+                              {m.dosage && ` — ${m.dosage}`}
+                              {m.frequency && ` · ${m.frequency}`}
+                              {m.duration && ` for ${m.duration}`}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Existing bill summary */}
+                    {hasBill && (
+                      <div className="bg-green-50 rounded-xl border border-green-200 p-4 space-y-3">
+                        <p className="text-sm font-semibold text-green-800">Bill Summary</p>
+                        <div className="rounded-lg border border-green-200 overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-green-100">
+                              <tr>
+                                <th className="text-left px-3 py-2 text-green-700 font-medium">Medicine</th>
+                                <th className="text-center px-3 py-2 text-green-700 font-medium">Qty</th>
+                                <th className="text-right px-3 py-2 text-green-700 font-medium">Unit Price</th>
+                                <th className="text-right px-3 py-2 text-green-700 font-medium">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {presc.bill.items.map((item: any) => (
+                                <tr key={item.id} className="border-t border-green-100">
+                                  <td className="px-3 py-2 text-slate-700">{item.medicineName}</td>
+                                  <td className="px-3 py-2 text-center text-slate-600">×{item.quantity}</td>
+                                  <td className="px-3 py-2 text-right text-slate-500">₹{Number(item.unitPrice).toFixed(2)}</td>
+                                  <td className="px-3 py-2 text-right text-slate-700 font-medium">₹{Number(item.totalPrice).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-xs text-slate-500 pt-1">
+                          <span>Subtotal: <strong className="text-slate-700">₹{Number(presc.bill.subtotal).toFixed(2)}</strong></span>
+                          <span>GST (5%): <strong className="text-slate-700">₹{Number(presc.bill.gstAmount).toFixed(2)}</strong></span>
+                          <span>Delivery: <strong className="text-slate-700">₹{Number(presc.bill.deliveryCharge).toFixed(2)}</strong></span>
+                          <span className="ml-auto text-sm font-bold text-sky-700">Total: ₹{Number(presc.bill.totalAmount).toFixed(2)}</span>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                          <p className="text-xs text-amber-700 font-medium">Delivery OTP (patient has this in their app)</p>
+                          <p className="text-2xl font-bold tracking-widest text-amber-800 font-mono mt-1">{presc.bill.otpCode}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bill generation form */}
+                    {!hasBill && (
+                      <div className="border border-slate-100 rounded-xl p-4 space-y-3">
+                        <p className="text-sm font-semibold text-slate-700">Generate Medicine Bill</p>
+                        <p className="text-xs text-slate-500">Enter the quantity and price for each medicine to generate the bill with GST and delivery charges.</p>
+
+                        {/* Bill items */}
+                        <div className="space-y-2">
+                          {form.items.map((item: any, idx: number) => (
+                            <div key={idx} className="flex gap-2 flex-wrap items-center">
+                              <input
+                                placeholder="Medicine name"
+                                value={item.medicineName}
+                                onChange={e => updateBillItem(presc.id, idx, "medicineName", e.target.value)}
+                                className="input flex-1 text-sm min-w-[140px]"
+                              />
+                              <input
+                                type="number" min={1}
+                                value={item.quantity}
+                                onChange={e => updateBillItem(presc.id, idx, "quantity", Number(e.target.value))}
+                                className="input w-20 text-sm text-center"
+                                placeholder="Qty"
+                              />
+                              <input
+                                type="number" min={0} step="0.01"
+                                value={item.unitPrice}
+                                onChange={e => updateBillItem(presc.id, idx, "unitPrice", parseFloat(e.target.value) || 0)}
+                                className="input w-28 text-sm text-right"
+                                placeholder="₹ Price"
+                              />
+                              <span className="text-xs text-slate-500 w-24 text-right">
+                                ₹{(item.quantity * item.unitPrice).toFixed(2)}
+                              </span>
+                              <button onClick={() => removeBillItem(presc.id, idx)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+                            </div>
+                          ))}
+                          <button onClick={() => addBillItem(presc.id)} className="text-sm text-sky-600 hover:underline">
+                            + Add medicine
+                          </button>
+                        </div>
+
+                        {/* Live cost preview */}
+                        {billSub > 0 && (
+                          <div className="bg-slate-50 rounded-lg px-4 py-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                            <span>Subtotal: <strong className="text-slate-700">₹{billSub.toFixed(2)}</strong></span>
+                            <span>GST (5%): <strong className="text-slate-700">₹{billGst.toFixed(2)}</strong></span>
+                            <span>Delivery: <strong className="text-slate-700">₹{billDel.toFixed(2)}</strong></span>
+                            <span className="ml-auto text-sm font-bold text-sky-700">Total: ₹{billTot.toFixed(2)}</span>
+                          </div>
+                        )}
+
+                        {billMsg[presc.id] && (
+                          <p className={`text-xs ${billMsg[presc.id].startsWith("Bill generated") ? "text-green-600 font-medium" : "text-red-500"}`}>
+                            {billMsg[presc.id]}
+                          </p>
+                        )}
+
+                        <button
+                          onClick={() => generateBill(presc.id)}
+                          disabled={billCreating[presc.id] || !form.items.length}
+                          className="btn-primary text-sm py-2 px-5"
+                        >
+                          {billCreating[presc.id] ? "Generating…" : "🧾 Generate Bill & Send OTP to Patient"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 );

@@ -11,6 +11,7 @@ const NAV = [
   { id: "lab",                   label: "Lab Tests",         icon: "🧪" },
   { id: "book-doctor",           label: "Find a Doctor",     icon: "👨‍⚕️" },
   { id: "hospitals",             label: "Hospitals",         icon: "🏢" },
+  { id: "bills",                 label: "My Bills",          icon: "🧾" },
   { id: "emi",                   label: "My EMI Plans",      icon: "📅" },
   { id: "profile",               label: "My Profile",        icon: "👤" },
 ];

@@ -47,7 +47,7 @@ export async function PATCH(
     if (status === "DECLINED" && !["SLOT_PROPOSED", "PENDING"].includes(existing.status)) {
       return NextResponse.json({ error: "Cannot decline at this stage" }, { status: 400 });
     }
-  } else if (["DOCTOR", "HOSPITAL_ADMIN"].includes(user.role)) {
+  } else if (["DOCTOR", "HOSPITAL_ADMIN", "SYSTEM_ADMIN"].includes(user.role)) {
     const allowed = ["ACCEPTED", "DECLINED", "COMPLETED", "CANCELLED", "SLOT_PROPOSED"];
     if (!allowed.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
