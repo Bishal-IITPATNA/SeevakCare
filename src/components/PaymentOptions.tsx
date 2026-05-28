@@ -26,14 +26,17 @@ interface Props {
   onError?: (msg: string) => void;
 }
 
+type Mode = "full" | "upi" | "emi" | "cod";
+
 export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }: Props) {
-  const [mode, setMode]           = useState<"full" | "emi" | "cod">("full");
-  const [tenure, setTenure]       = useState<EmiTenure>(3);
-  const [loading, setLoading]     = useState(false);
+  const [mode, setMode]                   = useState<Mode>("full");
+  const [tenure, setTenure]               = useState<EmiTenure>(3);
+  const [loading, setLoading]             = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const emi = calculateEmi(amount, tenure);
 
+  /* ── COD ─────────────────────────────────────────── */
   async function confirmCod() {
     if (loading) return;
     setLoading(true);
@@ -56,7 +59,8 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
     }
   }
 
-  async function pay(isEmi: boolean) {
+  /* ── Razorpay (online / UPI / EMI) ───────────────── */
+  async function pay(isEmi: boolean, upiOnly = false) {
     if (loading) return;
     setLoading(true);
     try {
@@ -79,21 +83,43 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         ? `Instalment 1/${tenure} — ₹${data.monthlyEmi?.toFixed(2)}`
         : `₹${amount.toFixed(2)}`;
 
+      // UPI-only config: shows QR code + PhonePe / GPay / Paytm intent buttons
+      const upiConfig = upiOnly
+        ? {
+            config: {
+              display: {
+                blocks: {
+                  upi_block: {
+                    name: "Pay via UPI",
+                    instruments: [
+                      { method: "upi", flows: ["qr"] },
+                      { method: "upi", flows: ["intent"], apps: ["google_pay", "phonepe", "paytm"] },
+                    ],
+                  },
+                },
+                sequence: ["block.upi_block"],
+                preferences: { show_default_blocks: false },
+              },
+            },
+          }
+        : {};
+
       const rzp = new window.Razorpay({
         key:         data.key,
         amount:      data.amount,
         currency:    data.currency,
         order_id:    data.razorpayOrderId,
         name:        "Seevak Care",
-        description: isEmi ? `EMI ${displayAmount}` : `Full payment ${displayAmount}`,
+        description: isEmi ? `EMI ${displayAmount}` : `Payment ${displayAmount}`,
         image:       "/logo.jpg",
         theme:       { color: "#0284c7" },
         prefill:     {},
         notes: {
           merchant_legal_entity: "RADIUS CARE WELL INDIA PRIVATE LIMITED",
-          terms_url: "/terms-and-conditions",
+          terms_url:  "/terms-and-conditions",
           refund_url: "/refund-policy",
         },
+        ...upiConfig,
         handler: async (response: any) => {
           const verifyRes = await fetch("/api/payments/verify", {
             method:  "POST",
@@ -111,7 +137,7 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
             onError?.(d.error ?? "Payment verification failed");
           }
         },
-        modal: { ondismiss: () => onError?.("Payment cancelled") },
+        modal: { ondismiss: () => { setLoading(false); onError?.("Payment cancelled"); } },
       });
 
       rzp.open();
@@ -122,45 +148,35 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
     }
   }
 
+  /* ── Shared tab style ─────────────────────────────── */
+  function tabClass(m: Mode, activeColor: string) {
+    return `flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+      mode === m ? `${activeColor} text-white border-transparent` : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+    }`;
+  }
+
   return (
     <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-4">
-      {/* Mode selector */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setMode("full")}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-            mode === "full"
-              ? "bg-sky-600 text-white border-sky-600"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          💳 Pay Online
+
+      {/* ── Mode tabs ─────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => setMode("full")} className={tabClass("full", "bg-sky-600")}>
+          💳 Card / Net Banking
         </button>
-        <button
-          onClick={() => setMode("emi")}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-            mode === "emi"
-              ? "bg-green-600 text-white border-green-600"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          📅 EMI
+        <button onClick={() => setMode("upi")} className={tabClass("upi", "bg-violet-600")}>
+          📱 UPI / Scanner
+        </button>
+        <button onClick={() => setMode("emi")} className={tabClass("emi", "bg-green-600")}>
+          📅 Pay in EMI
         </button>
         {type === "MEDICINE_ORDER" && (
-          <button
-            onClick={() => setMode("cod")}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              mode === "cod"
-                ? "bg-amber-500 text-white border-amber-500"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-amber-50"
-            }`}
-          >
+          <button onClick={() => setMode("cod")} className={tabClass("cod", "bg-amber-500")}>
             💵 Cash on Delivery
           </button>
         )}
       </div>
 
-      {/* T&C acceptance — required by Razorpay guidelines */}
+      {/* ── T&C ───────────────────────────────────────── */}
       <label className="flex items-start gap-2 cursor-pointer">
         <input
           type="checkbox"
@@ -181,19 +197,47 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         </span>
       </label>
 
+      {/* ── Card / Net Banking ────────────────────────── */}
       {mode === "full" && (
         <button
-          onClick={() => pay(false)}
+          onClick={() => pay(false, false)}
           disabled={loading || !termsAccepted}
           className="w-full btn-primary py-2.5 flex items-center justify-center gap-2"
         >
-          {loading ? "Processing…" : `💳 Pay ₹${amount.toFixed(2)} Online`}
+          {loading ? "Processing…" : `💳 Pay ₹${amount.toFixed(2)} via Card / Net Banking`}
         </button>
       )}
 
+      {/* ── UPI / Scanner ─────────────────────────────── */}
+      {mode === "upi" && (
+        <div className="space-y-3">
+          <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 space-y-2">
+            <p className="text-sm font-semibold text-violet-800">📱 Pay via UPI</p>
+            <p className="text-xs text-violet-700">
+              Scan the QR code or pay directly from PhonePe, Google Pay, or Paytm.
+              Razorpay will open a QR code + app selector automatically.
+            </p>
+            {/* App logos row */}
+            <div className="flex items-center gap-3 pt-1">
+              <span className="text-xs font-medium bg-white border border-violet-200 rounded-full px-2 py-0.5 text-violet-700">PhonePe</span>
+              <span className="text-xs font-medium bg-white border border-violet-200 rounded-full px-2 py-0.5 text-violet-700">Google Pay</span>
+              <span className="text-xs font-medium bg-white border border-violet-200 rounded-full px-2 py-0.5 text-violet-700">Paytm</span>
+              <span className="text-xs text-violet-500">+ any UPI app</span>
+            </div>
+          </div>
+          <button
+            onClick={() => pay(false, true)}
+            disabled={loading || !termsAccepted}
+            className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {loading ? "Opening…" : `📱 Pay ₹${amount.toFixed(2)} via UPI`}
+          </button>
+        </div>
+      )}
+
+      {/* ── EMI ───────────────────────────────────────── */}
       {mode === "emi" && (
         <div className="space-y-3">
-          {/* Tenure picker */}
           <div>
             <p className="text-xs text-slate-500 mb-2 font-medium">Select tenure ({EMI_ANNUAL_RATE}% interest p.a.)</p>
             <div className="flex gap-2">
@@ -212,8 +256,6 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
               ))}
             </div>
           </div>
-
-          {/* EMI breakdown */}
           <div className="bg-white rounded-lg border border-slate-200 p-3 text-sm space-y-1.5">
             <div className="flex justify-between">
               <span className="text-slate-500">Principal</span>
@@ -232,13 +274,11 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
               <span className="text-green-700 font-bold text-base">₹{emi.monthlyEmi.toFixed(2)}</span>
             </div>
           </div>
-
           <p className="text-xs text-slate-400">
             Service activates after 1st instalment. Remaining instalments due monthly.
           </p>
-
           <button
-            onClick={() => pay(true)}
+            onClick={() => pay(true, false)}
             disabled={loading || !termsAccepted}
             className="w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
           >
@@ -246,6 +286,8 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
           </button>
         </div>
       )}
+
+      {/* ── Cash on Delivery ──────────────────────────── */}
       {mode === "cod" && (
         <div className="space-y-3">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 space-y-1">
@@ -253,11 +295,10 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
             <p>Pay <strong>₹{amount.toFixed(2)}</strong> in cash when your order arrives at your door.</p>
             <ul className="text-xs text-amber-700 list-disc list-inside space-y-0.5 pt-1">
               <li>Keep exact change ready</li>
-              <li>You will receive a 6-digit OTP — share it with the delivery person to confirm receipt</li>
+              <li>Share your 6-digit OTP with the delivery person to confirm receipt</li>
               <li>COD available for orders up to ₹5,000</li>
             </ul>
           </div>
-
           <button
             onClick={confirmCod}
             disabled={loading || !termsAccepted}
