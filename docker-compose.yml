@@ -1,6 +1,18 @@
 version: "3.8"
 
 services:
+  # ── Runs `prisma db push` once on every stack start ────────────
+  migrate:
+    build:
+      context: .
+      target: migrate           # uses the lightweight migrate stage
+    container_name: seevak-care-migrate
+    env_file: .env.local
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"               # run once and exit
+
   app:
     build: .
     container_name: seevak-care
@@ -10,6 +22,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   db:

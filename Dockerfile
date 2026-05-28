@@ -12,7 +12,16 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# ─── Stage 3: production runner ────────────────────────────────
+# ─── Stage 3: database migration runner ─────────────────────────
+# Lightweight stage that only runs `prisma db push`.
+# docker-compose runs this before the app container starts.
+FROM node:20-alpine AS migrate
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY prisma ./prisma
+CMD ["node_modules/.bin/prisma", "db", "push", "--skip-generate"]
+
+# ─── Stage 4: production runner ────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

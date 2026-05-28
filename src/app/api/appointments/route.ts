@@ -146,46 +146,59 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const appointment = await prisma.appointment.create({
-    data: {
-      patientId: patient.id,
-      doctorId:    doctorId    || null,
-      chamberId:   chamberId   || null,
-      hospitalId:  hospitalId  || null,
-      departmentId: departmentId || null,
-      appointmentDate: new Date(appointmentDate),
-      slotTime,
-      reason,
-      consultationFee: consultationFee ? consultationFee : null,
-    },
-    include: { doctor: { include: { user: true } } },
-  });
-
-  // Notify doctor
-  if (appointment.doctor) {
-    await prisma.notification.create({
+  let appointment;
+  try {
+    appointment = await prisma.appointment.create({
       data: {
-        userId:  appointment.doctor.userId,
+        patientId: patient.id,
+        doctorId:    doctorId    || null,
+        chamberId:   chamberId   || null,
+        hospitalId:  hospitalId  || null,
+        departmentId: departmentId || null,
+        appointmentDate: new Date(appointmentDate),
+        slotTime,
+        reason,
+        consultationFee: consultationFee ? consultationFee : null,
+      },
+      // Only include doctor when one is linked — avoids SELECT on null relation
+      ...(doctorId ? { include: { doctor: { include: { user: true } } } } : {}),
+    });
+  } catch (err: any) {
+    console.error("appointment create error:", err);
+    const msg =
+      err?.code === "P2003" ? "Invalid department or hospital reference. Please try again." :
+      err?.code === "P2002" ? "You already have an appointment booked for this slot." :
+      "Failed to create appointment. Please try again.";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
+  // Notify doctor (non-blocking)
+  if (appointment.doctor) {
+    prisma.notification.create({
+      data: {
+        userId:  (appointment as any).doctor.userId,
         title:   "New Appointment Request",
         message: `${user.name} has requested an appointment on ${new Date(appointmentDate).toDateString()} at ${slotTime}.`,
         type:    "APPOINTMENT",
       },
-    });
+    }).catch(e => console.error("doctor notification error:", e));
   }
 
-  // Notify hospital admin (hospital bookings have no doctor, so this is the only alert they get)
+  // Notify hospital admin (non-blocking — must never break the booking response)
   if (hospitalId && !doctorId) {
-    const admin = await prisma.hospitalAdmin.findFirst({ where: { hospitalId } });
-    if (admin) {
-      await prisma.notification.create({
-        data: {
-          userId:  admin.userId,
-          title:   "New Appointment Request",
-          message: `${user.name} has requested an appointment on ${new Date(appointmentDate).toDateString()} at ${slotTime}. Please review and confirm.`,
-          type:    "APPOINTMENT",
-        },
-      });
-    }
+    prisma.hospitalAdmin.findFirst({ where: { hospitalId } })
+      .then(admin => {
+        if (!admin) return;
+        return prisma.notification.create({
+          data: {
+            userId:  admin.userId,
+            title:   "New Appointment Request",
+            message: `${user.name} has requested an appointment on ${new Date(appointmentDate).toDateString()} at ${slotTime}. Please review and confirm.`,
+            type:    "APPOINTMENT",
+          },
+        });
+      })
+      .catch(e => console.error("hospital admin notification error:", e));
   }
 
   return NextResponse.json(appointment, { status: 201 });
