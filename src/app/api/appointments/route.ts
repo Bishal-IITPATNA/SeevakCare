@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Notify doctor (non-blocking)
-  if (appointment.doctor) {
+  if ((appointment as any).doctor) {
     prisma.notification.create({
       data: {
         userId:  (appointment as any).doctor.userId,
