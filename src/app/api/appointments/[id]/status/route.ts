@@ -57,8 +57,7 @@ export async function PATCH(
 
   // ── Build update payload ──────────────────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateData: any = { status };
+  const updateData: Record<string, unknown> = { status };
   if (notes !== undefined) updateData.notes = notes;
 
   if (status === "SLOT_PROPOSED") {

@@ -52,9 +52,10 @@ export default function DoctorDashboard() {
   }, [router]);
 
   // Load doctor profile when profile tab opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (tab === "profile" && !profile) loadProfile();
-  }, [tab]);
+  }, [tab, profile]);
 
   async function loadProfile() {
     const res = await fetch("/api/doctors/profile");
