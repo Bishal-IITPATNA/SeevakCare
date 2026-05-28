@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { sendEmail, appointmentNotificationEmail } from "@/lib/utils/email";
@@ -11,9 +12,14 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { status, notes, proposedDate, proposedSlotTime } = body;
+  const { status, notes, proposedDate, proposedSlotTime } = body as {
+    status: string;
+    notes?: string;
+    proposedDate?: string;
+    proposedSlotTime?: string;
+  };
 
-  // Fetch current appointment for ownership/state checks
+  // Fetch current appointment for ownership / state checks
   const existing = await prisma.appointment.findUnique({
     where:   { id: params.id },
     include: {
@@ -27,12 +33,10 @@ export async function PATCH(
   // ── Permission gates ──────────────────────────────────────────────────────
 
   if (user.role === "PATIENT") {
-    // Patient can only act on their own appointments
     const patient = await prisma.patient.findUnique({ where: { userId: user.id } });
     if (!patient || existing.patientId !== patient.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    // Patient may only accept or decline a slot proposal, or cancel a pending booking
     const allowed = ["ACCEPTED", "DECLINED", "CANCELLED"];
     if (!allowed.includes(status)) {
       return NextResponse.json({ error: "Patients can only accept, decline or cancel" }, { status: 400 });
@@ -55,29 +59,29 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  // ── Build update payload ──────────────────────────────────────────────────
+  // ── Build update payload inline so Prisma can infer the type ─────────────
 
-  const updateData: Record<string, unknown> = { status };
-  if (notes !== undefined) updateData.notes = notes;
-
-  if (status === "SLOT_PROPOSED") {
-    updateData.proposedDate     = new Date(proposedDate);
-    updateData.proposedSlotTime = proposedSlotTime;
-  }
-
-  if (status === "ACCEPTED" && existing.status === "SLOT_PROPOSED" && existing.proposedDate) {
-    // Patient accepted the proposed slot — lock in the new date/time
-    updateData.appointmentDate  = existing.proposedDate;
-    updateData.slotTime         = existing.proposedSlotTime;
-    updateData.proposedDate     = null;
-    updateData.proposedSlotTime = null;
-  }
-
-  // ── Persist ───────────────────────────────────────────────────────────────
+  const isAcceptingProposal =
+    status === "ACCEPTED" &&
+    existing.status === "SLOT_PROPOSED" &&
+    existing.proposedDate != null;
 
   const appointment = await prisma.appointment.update({
-    where:   { id: params.id },
-    data:    updateData,
+    where: { id: params.id },
+    data:  {
+      status: status as AppointmentStatus,
+      ...(notes !== undefined        ? { notes }                                  : {}),
+      ...(status === "SLOT_PROPOSED" ? {
+        proposedDate:     new Date(proposedDate!),
+        proposedSlotTime: proposedSlotTime!,
+      } : {}),
+      ...(isAcceptingProposal ? {
+        appointmentDate:  existing.proposedDate!,
+        slotTime:         existing.proposedSlotTime ?? existing.slotTime,
+        proposedDate:     null,
+        proposedSlotTime: null,
+      } : {}),
+    },
     include: {
       patient:  { include: { user: true } },
       doctor:   { include: { user: true } },
@@ -87,51 +91,48 @@ export async function PATCH(
 
   // ── Notifications ─────────────────────────────────────────────────────────
 
-  const patUser    = appointment.patient.user;
-  const actorName  = appointment.doctor?.user?.name ?? appointment.hospital?.name ?? "Hospital";
-  const dateStr    = new Date(appointment.appointmentDate).toDateString();
+  const patUser   = appointment.patient.user;
+  const actorName = appointment.doctor?.user?.name ?? appointment.hospital?.name ?? "Hospital";
+  const dateStr   = new Date(appointment.appointmentDate).toDateString();
 
   let notifTitle   = `Appointment ${status}`;
   let notifMessage = `${actorName} has ${status.toLowerCase()} your appointment on ${dateStr}.`;
 
   if (status === "SLOT_PROPOSED") {
-    const propDate = new Date(proposedDate).toDateString();
+    const propDate = new Date(proposedDate!).toDateString();
     notifTitle   = "New Slot Proposed";
     notifMessage = `${actorName} has proposed a new slot: ${propDate} at ${proposedSlotTime}. Please review and accept or decline.`;
-  } else if (status === "ACCEPTED" && existing.status === "SLOT_PROPOSED") {
-    // Patient accepted — notify hospital admin
+
+  } else if (isAcceptingProposal) {
     const newDate = new Date(existing.proposedDate!).toDateString();
-    notifTitle   = "Slot Accepted by Patient";
-    notifMessage = `Patient ${patUser.name} accepted the proposed slot: ${newDate} at ${existing.proposedSlotTime}.`;
-    // Notify hospital admin instead
+
+    // Notify hospital admin that patient accepted
     if (existing.hospitalId) {
       const admin = await prisma.hospitalAdmin.findFirst({ where: { hospitalId: existing.hospitalId } });
       if (admin) {
         await prisma.notification.create({
-          data: { userId: admin.userId, title: notifTitle, message: notifMessage, type: "APPOINTMENT" },
+          data: {
+            userId:  admin.userId,
+            title:   "Slot Accepted by Patient",
+            message: `${patUser.name} accepted the proposed slot: ${newDate} at ${existing.proposedSlotTime}.`,
+            type:    "APPOINTMENT",
+          },
         });
       }
     }
-    // Still notify patient of their confirmed slot
+    // Patient-facing message
     notifTitle   = "Slot Confirmed";
     notifMessage = `Your appointment at ${actorName} has been confirmed for ${newDate} at ${existing.proposedSlotTime}.`;
+
   } else if (status === "DECLINED" && notes) {
     notifMessage += ` Reason: ${notes}`;
   }
 
-  // Notify patient (for most status changes)
-  if (!(status === "ACCEPTED" && existing.status === "SLOT_PROPOSED")) {
-    // For patient-accepted proposed slot, notification was already handled above
-    await prisma.notification.create({
-      data: { userId: patUser.id, title: notifTitle, message: notifMessage, type: "APPOINTMENT" },
-    });
-  } else {
-    await prisma.notification.create({
-      data: { userId: patUser.id, title: notifTitle, message: notifMessage, type: "APPOINTMENT" },
-    });
-  }
+  await prisma.notification.create({
+    data: { userId: patUser.id, title: notifTitle, message: notifMessage, type: "APPOINTMENT" },
+  });
 
-  // Email (non-blocking)
+  // Email (non-blocking, skip for slot proposals — patient must first accept)
   if (status !== "SLOT_PROPOSED") {
     await sendEmail({
       to:      patUser.email,
