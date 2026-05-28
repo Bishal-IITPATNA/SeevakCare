@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PaymentOptions } from "@/components/PaymentOptions";
 import { StarInput } from "@/components/StarRating";
 
@@ -13,6 +14,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export function AppointmentCard({ appointment, onStatusChange }: { appointment: any; onStatusChange?: () => void }) {
+  const router   = useRouter();
   const docName  = appointment.doctor?.user?.name;
   const hospName = appointment.hospital?.name;
   const dateStr  = new Date(appointment.appointmentDate).toDateString();
@@ -21,6 +23,7 @@ export function AppointmentCard({ appointment, onStatusChange }: { appointment: 
 
   // Slot-proposal state
   const [slotActing, setSlotActing] = useState(false);
+  const [slotError,  setSlotError]  = useState("");
 
   // Review state
   const [rating, setRating]         = useState(0);
@@ -33,15 +36,30 @@ export function AppointmentCard({ appointment, onStatusChange }: { appointment: 
   const isProposed     = appointment.status === "SLOT_PROPOSED";
   const canReview      = isCompleted && (appointment.doctorId || appointment.hospitalId);
 
-  async function actOnSlot(status: "ACCEPTED" | "DECLINED") {
+  async function actOnSlot(action: "ACCEPTED" | "DECLINED") {
     setSlotActing(true);
-    await fetch(`/api/appointments/${appointment.id}/status`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ status }),
-    });
-    setSlotActing(false);
-    onStatusChange?.();
+    setSlotError("");
+    try {
+      const res = await fetch(`/api/appointments/${appointment.id}/status`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ status: action }),
+      });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setSlotError(d.error ?? "Action failed. Please try again.");
+        return;
+      }
+      onStatusChange?.();
+    } catch {
+      setSlotError("Network error. Please check your connection and try again.");
+    } finally {
+      setSlotActing(false);
+    }
   }
 
   async function submitReview() {
@@ -124,6 +142,11 @@ export function AppointmentCard({ appointment, onStatusChange }: { appointment: 
               <p className="text-xs text-purple-600 mt-1 italic">{appointment.notes}</p>
             )}
           </div>
+          {slotError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              ⚠️ {slotError}
+            </p>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => actOnSlot("ACCEPTED")}

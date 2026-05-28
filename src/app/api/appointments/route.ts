@@ -173,5 +173,20 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Notify hospital admin (hospital bookings have no doctor, so this is the only alert they get)
+  if (hospitalId && !doctorId) {
+    const admin = await prisma.hospitalAdmin.findFirst({ where: { hospitalId } });
+    if (admin) {
+      await prisma.notification.create({
+        data: {
+          userId:  admin.userId,
+          title:   "New Appointment Request",
+          message: `${user.name} has requested an appointment on ${new Date(appointmentDate).toDateString()} at ${slotTime}. Please review and confirm.`,
+          type:    "APPOINTMENT",
+        },
+      });
+    }
+  }
+
   return NextResponse.json(appointment, { status: 201 });
 }

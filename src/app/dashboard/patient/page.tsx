@@ -192,6 +192,10 @@ export default function PatientDashboard() {
       setHTcAccepted(false);
       const fresh = await fetch("/api/appointments").then(r => r.json());
       setAppointments(Array.isArray(fresh) ? fresh : []);
+    } else if (res.status === 401) {
+      // Session expired — redirect to login
+      router.push("/login");
+      return;
     } else {
       const d = await res.json();
       setHBookingMsg(d.error ?? "Booking failed");
