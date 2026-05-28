@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { RazorpayButton } from "./RazorpayButton";
+import { PaymentOptions } from "./PaymentOptions";
+import { StarDisplay } from "./StarRating";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -10,17 +11,20 @@ export function BookDoctor() {
   const [form, setForm]         = useState({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" });
   const [booked, setBooked]     = useState<any>(null);
   const [search, setSearch]     = useState("");
+  const [sortByRating, setSortByRating] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
 
   useEffect(() => {
     const t = setTimeout(async () => {
-      const res = await fetch(`/api/doctors/search?q=${encodeURIComponent(search)}`);
+      const params = new URLSearchParams({ q: search });
+      if (sortByRating) params.set("sortBy", "rating");
+      const res = await fetch(`/api/doctors/search?${params}`);
       const data = await res.json();
       setDoctors(Array.isArray(data) ? data : []);
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, sortByRating]);
 
   async function book() {
     if (!form.appointmentDate || !form.slotTime) {
@@ -45,19 +49,31 @@ export function BookDoctor() {
   }
 
   if (booked) return (
-    <div className="card max-w-md">
-      <div className="text-4xl mb-3">✅</div>
+    <div className="card max-w-lg">
+      <div className="text-4xl mb-2">✅</div>
       <h3 className="text-lg font-bold text-slate-800 mb-1">Appointment Requested!</h3>
-      <p className="text-slate-500 text-sm mb-4">Pay the consultation fee to confirm your slot.</p>
-      <RazorpayButton
-        type="APPOINTMENT"
-        referenceId={booked.id}
-        label={`Pay Consultation Fee (₹${Number(booked.consultationFee ?? 0).toFixed(2)})`}
-        onSuccess={() => alert("Payment successful! Your appointment is confirmed.")}
-        onError={(msg) => alert(msg)}
-      />
-      <button onClick={() => { setBooked(null); setSelected(null); setForm({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" }); }}
-        className="btn-secondary w-full mt-3">Book another</button>
+      {Number(booked.consultationFee ?? 0) > 0 ? (
+        <>
+          <p className="text-slate-500 text-sm mb-4">
+            Pay the consultation fee of <strong>₹{Number(booked.consultationFee).toLocaleString("en-IN")}</strong> to confirm your slot.
+          </p>
+          <PaymentOptions
+            type="APPOINTMENT"
+            referenceId={booked.id}
+            amount={Number(booked.consultationFee)}
+            onSuccess={() => { setBooked(null); setSelected(null); setForm({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" }); alert("Payment successful! Your appointment is confirmed."); }}
+            onError={(msg) => setError(msg)}
+          />
+        </>
+      ) : (
+        <p className="text-slate-500 text-sm mb-4">Your appointment request has been sent. You will be notified once the doctor accepts.</p>
+      )}
+      <button
+        onClick={() => { setBooked(null); setSelected(null); setForm({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" }); }}
+        className="btn-secondary w-full mt-3"
+      >
+        Back to Doctor List
+      </button>
     </div>
   );
 
@@ -65,15 +81,28 @@ export function BookDoctor() {
     <div>
       {!selected ? (
         <>
-          <div className="relative mb-4">
-            <span className="absolute left-3 top-2.5 text-slate-400">🔍</span>
-            <input
-              placeholder="Search by name, specialization, city..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="input pl-9"
-            />
+          <div className="flex gap-2 mb-3">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-2.5 text-slate-400">🔍</span>
+              <input
+                placeholder="Search by name, specialization, city..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="input pl-9"
+              />
+            </div>
+            <button
+              onClick={() => setSortByRating(s => !s)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap ${
+                sortByRating
+                  ? "bg-amber-500 text-white border-amber-500"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-amber-50"
+              }`}
+            >
+              ★ {sortByRating ? "Rated First" : "Sort by Rating"}
+            </button>
           </div>
+
           <div className="grid gap-3">
             {doctors.map(d => (
               <div key={d.id} onClick={() => setSelected(d)}
@@ -81,7 +110,12 @@ export function BookDoctor() {
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-xl">👨‍⚕️</div>
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-800">{d.user.name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-slate-800">{d.user.name}</p>
+                      {d.avgRating > 0 && (
+                        <StarDisplay rating={d.avgRating} count={d.reviewCount} size="sm" />
+                      )}
+                    </div>
                     <p className="text-sm text-sky-600">{d.specialization}</p>
                     <p className="text-xs text-slate-400">{d.qualifications} · {d.experienceYears}y exp</p>
                     <div className="flex items-center gap-3 mt-2">
@@ -117,6 +151,9 @@ export function BookDoctor() {
             <div>
               <p className="font-semibold">{selected.user.name}</p>
               <p className="text-sm text-sky-600">{selected.specialization}</p>
+              {selected.avgRating > 0 && (
+                <StarDisplay rating={selected.avgRating} count={selected.reviewCount} size="sm" />
+              )}
             </div>
           </div>
 

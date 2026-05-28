@@ -32,11 +32,13 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL:   ${{ secrets.DIRECT_URL }}
 
       - name: Push schema to database
         run: npx prisma db push --accept-data-loss
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL:   ${{ secrets.DIRECT_URL }}
 
       - name: Type-check
         run: npx tsc --noEmit
@@ -48,6 +50,7 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL:                ${{ secrets.DATABASE_URL }}
+          DIRECT_URL:                  ${{ secrets.DIRECT_URL }}
           NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
           NEXT_PUBLIC_APP_URL:         ${{ secrets.NEXT_PUBLIC_APP_URL }}
 

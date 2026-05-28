@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
       data:  { status: "CONFIRMED" },
     });
   }
+  if (payment.appointmentId) {
+    // Mark appointment as ACCEPTED (confirmed) once paid
+    await prisma.appointment.update({
+      where: { id: payment.appointmentId },
+      data:  { status: "ACCEPTED" },
+    });
+  }
 
   const isEmi = !!payment.emiPlan;
   const notifMsg = isEmi

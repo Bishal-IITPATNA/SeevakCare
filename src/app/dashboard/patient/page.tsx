@@ -10,6 +10,7 @@ import { LabBookingCard } from "@/components/cards/LabBookingCard";
 import { BookDoctor } from "@/components/BookDoctor";
 import { EmiPlansSection } from "@/components/EmiPlansSection";
 import { PrescriptionUploadSection } from "@/components/PrescriptionUploadSection";
+import { StarDisplay } from "@/components/StarRating";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS      = ["Male", "Female", "Other", "Prefer not to say"];
@@ -44,6 +45,7 @@ export default function PatientDashboard() {
   const [selectedHospital, setSelectedHospital]   = useState<any>(null);
   const [hBooking, setHBooking]           = useState({ departmentId: "", appointmentDate: "", slotTime: "", reason: "" });
   const [hBookingMsg, setHBookingMsg]     = useState("");
+  const [hospitalSortByRating, setHospitalSortByRating] = useState(false);
 
   // Hospital services + T&C state
   const [hServices, setHServices]         = useState<any[]>([]);
@@ -120,15 +122,23 @@ export default function PatientDashboard() {
     setProfileSaving(false);
   }
 
-  async function searchHospitals() {
+  async function searchHospitals(overrideSortByRating?: boolean) {
     setHospitalSearching(true);
     const params = new URLSearchParams();
     if (hospitalQuery) params.set("q", hospitalQuery);
     if (hospitalCity)  params.set("city", hospitalCity);
+    const useRating = overrideSortByRating ?? hospitalSortByRating;
+    if (useRating)     params.set("sortBy", "rating");
     const res = await fetch(`/api/hospitals/search?${params}`);
     const data = await res.json();
     setHospitals(Array.isArray(data) ? data : []);
     setHospitalSearching(false);
+  }
+
+  function toggleHospitalSort() {
+    const next = !hospitalSortByRating;
+    setHospitalSortByRating(next);
+    searchHospitals(next);
   }
 
   async function selectHospital(h: any) {
@@ -159,11 +169,12 @@ export default function PatientDashboard() {
     const res = await fetch("/api/appointments", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        hospitalId:   selectedHospital.id,
-        departmentId: hBooking.departmentId,
+        hospitalId:      selectedHospital.id,
+        departmentId:    hBooking.departmentId,
         appointmentDate: hBooking.appointmentDate,
-        slotTime:     hBooking.slotTime,
-        reason:       hBooking.reason,
+        slotTime:        hBooking.slotTime,
+        reason:          hBooking.reason,
+        consultationFee: selectedService ? Number(selectedService.price) : undefined,
       }),
     });
     if (res.ok) {
@@ -402,23 +413,33 @@ export default function PatientDashboard() {
             <div>
               {!selectedHospital ? (
                 <>
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-2 mb-4 flex-wrap">
                     <input
                       placeholder="Search by name or keyword…"
                       value={hospitalQuery}
                       onChange={e => setHospitalQuery(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && searchHospitals()}
-                      className="input flex-1"
+                      className="input flex-1 min-w-0"
                     />
                     <input
                       placeholder="City"
                       value={hospitalCity}
                       onChange={e => setHospitalCity(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && searchHospitals()}
-                      className="input w-36"
+                      className="input w-32"
                     />
-                    <button onClick={searchHospitals} disabled={hospitalSearching} className="btn-primary whitespace-nowrap">
+                    <button onClick={() => searchHospitals()} disabled={hospitalSearching} className="btn-primary whitespace-nowrap">
                       {hospitalSearching ? "…" : "Search"}
+                    </button>
+                    <button
+                      onClick={toggleHospitalSort}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap ${
+                        hospitalSortByRating
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-amber-50"
+                      }`}
+                    >
+                      ★ {hospitalSortByRating ? "Rated First" : "Sort by Rating"}
                     </button>
                   </div>
 
@@ -432,13 +453,18 @@ export default function PatientDashboard() {
                   <div className="grid gap-3">
                     {hospitals.map(h => (
                       <div key={h.id} className="card">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-semibold text-slate-800">{h.name}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-slate-800">{h.name}</p>
+                              {h.avgRating > 0 && (
+                                <StarDisplay rating={h.avgRating} count={h.reviewCount} size="sm" />
+                              )}
+                            </div>
                             <p className="text-sm text-slate-500">{h.address}, {h.city}</p>
                             <p className="text-xs text-slate-400 mt-0.5">{h.phone} · {h.email}</p>
                           </div>
-                          <button onClick={() => selectHospital(h)} className="btn-primary text-xs whitespace-nowrap">
+                          <button onClick={() => selectHospital(h)} className="btn-primary text-xs whitespace-nowrap shrink-0">
                             Book →
                           </button>
                         </div>
@@ -459,11 +485,14 @@ export default function PatientDashboard() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => { setSelectedHospital(null); setSelectedService(null); setHTcAccepted(false); }}
-                      className="text-slate-400 hover:text-slate-600 text-sm"
+                      className="text-slate-400 hover:text-slate-600 text-sm shrink-0"
                     >← Back</button>
                     <div>
                       <h3 className="font-bold text-slate-800">{selectedHospital.name}</h3>
                       <p className="text-xs text-slate-400">{selectedHospital.address}, {selectedHospital.city}</p>
+                      {selectedHospital.avgRating > 0 && (
+                        <StarDisplay rating={selectedHospital.avgRating} count={selectedHospital.reviewCount} size="sm" />
+                      )}
                     </div>
                   </div>
 

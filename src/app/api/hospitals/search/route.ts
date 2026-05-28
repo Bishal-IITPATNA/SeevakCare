@@ -7,8 +7,9 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const q    = searchParams.get("q")?.trim() ?? "";
-  const city = searchParams.get("city")?.trim() ?? "";
+  const q      = searchParams.get("q")?.trim() ?? "";
+  const city   = searchParams.get("city")?.trim() ?? "";
+  const sortBy = searchParams.get("sortBy")?.trim() ?? "";   // "rating" | ""
 
   const hospitals = await prisma.hospital.findMany({
     where: {
@@ -23,8 +24,35 @@ export async function GET(req: NextRequest) {
       },
     },
     orderBy: { name: "asc" },
-    take: 30,
+    take: 50,
   });
 
-  return NextResponse.json(hospitals);
+  // Fetch average ratings for these hospitals
+  const hospitalIds = hospitals.map(h => h.id);
+  const ratingsRaw = hospitalIds.length > 0
+    ? await prisma.review.groupBy({
+        by:    ["hospitalId"],
+        where: { hospitalId: { in: hospitalIds } },
+        _avg:  { rating: true },
+        _count: { rating: true },
+      })
+    : [];
+
+  const ratingMap: Record<string, { avg: number; count: number }> = {};
+  for (const r of ratingsRaw) {
+    if (r.hospitalId) ratingMap[r.hospitalId] = { avg: r._avg.rating ?? 0, count: r._count.rating };
+  }
+
+  let result = hospitals.map(h => ({
+    ...h,
+    avgRating:   parseFloat((ratingMap[h.id]?.avg ?? 0).toFixed(1)),
+    reviewCount: ratingMap[h.id]?.count ?? 0,
+  }));
+
+  // Sort by rating descending if requested
+  if (sortBy === "rating") {
+    result.sort((a, b) => b.avgRating - a.avgRating || b.reviewCount - a.reviewCount);
+  }
+
+  return NextResponse.json(result);
 }

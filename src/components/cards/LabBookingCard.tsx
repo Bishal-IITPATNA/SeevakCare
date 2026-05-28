@@ -70,12 +70,13 @@ export function LabBookingCard({ booking, onUpdate }: { booking: any; onUpdate?:
         </div>
       )}
 
-      {verified && booking.status === "PENDING" && !booking.payment && (
+      {verified && booking.status === "PENDING" && booking.payment?.status !== "SUCCESS" && (
         <PaymentOptions
           type="LAB_BOOKING"
           referenceId={booking.id}
           amount={Number(booking.labTest?.price ?? 0)}
           onSuccess={onUpdate}
+          onError={(msg) => alert(msg)}
         />
       )}
     </div>

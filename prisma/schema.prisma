@@ -151,6 +151,7 @@ model Patient {
   medicineOrders        MedicineOrder[]
   labBookings           LabBooking[]
   prescriptionUploads   PrescriptionUpload[]
+  reviews               Review[]
 }
 
 // ───────────────────────────────────────────
@@ -174,6 +175,7 @@ model Doctor {
   appointments      Appointment[]
   prescriptions     Prescription[]
   departmentDoctors DepartmentDoctor[]
+  reviews           Review[]
 }
 
 model Chamber {
@@ -221,6 +223,7 @@ model Hospital {
   admins       HospitalAdmin[]
   appointments Appointment[]
   services     HospitalService[]
+  reviews      Review[]
 }
 
 model HospitalAdmin {
@@ -548,6 +551,29 @@ model HospitalService {
 
   hospital   Hospital    @relation(fields: [hospitalId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])
+}
+
+// ───────────────────────────────────────────
+// REVIEWS & RATINGS
+// ───────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(cuid())
+  patientId  String
+  reviewType String   // "DOCTOR" | "HOSPITAL"
+  doctorId   String?
+  hospitalId String?
+  rating     Int      // 1–5
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  patient  Patient   @relation(fields: [patientId], references: [id])
+  doctor   Doctor?   @relation(fields: [doctorId], references: [id])
+  hospital Hospital? @relation(fields: [hospitalId], references: [id])
+
+  @@unique([patientId, doctorId])
+  @@unique([patientId, hospitalId])
 }
 
 // ───────────────────────────────────────────
