@@ -26,25 +26,28 @@ export async function GET(req: NextRequest) {
       user:     { select: { name: true, email: true } },
       chambers: { include: { schedules: true }         },
     },
-    skip:    sortBy === "rating" ? 0 : (page - 1) * limit,  // fetch all if sorting by rating
+    skip:    sortBy === "rating" ? 0 : (page - 1) * limit,
     take:    sortBy === "rating" ? 200 : limit,
     orderBy: { createdAt: "desc" },
   });
 
-  // Fetch average ratings for these doctors
-  const doctorIds = doctors.map(d => d.id);
-  const ratingsRaw = doctorIds.length > 0
-    ? await prisma.review.groupBy({
-        by:    ["doctorId"],
-        where: { doctorId: { in: doctorIds } },
-        _avg:  { rating: true },
-        _count: { rating: true },
-      })
-    : [];
-
+  // Start with zero ratings for all doctors; populate if the Review table exists
   const ratingMap: Record<string, { avg: number; count: number }> = {};
-  for (const r of ratingsRaw) {
-    if (r.doctorId) ratingMap[r.doctorId] = { avg: r._avg.rating ?? 0, count: r._count.rating };
+  try {
+    const doctorIds = doctors.map(d => d.id);
+    if (doctorIds.length > 0) {
+      const ratingsRaw = await prisma.review.groupBy({
+        by:     ["doctorId"],
+        where:  { doctorId: { in: doctorIds } },
+        _avg:   { rating: true },
+        _count: { rating: true },
+      });
+      for (const r of ratingsRaw) {
+        if (r.doctorId) ratingMap[r.doctorId] = { avg: r._avg.rating ?? 0, count: r._count.rating };
+      }
+    }
+  } catch {
+    // Review table not yet migrated — return doctors without ratings
   }
 
   let result = doctors.map(d => ({

@@ -27,20 +27,23 @@ export async function GET(req: NextRequest) {
     take: 50,
   });
 
-  // Fetch average ratings for these hospitals
-  const hospitalIds = hospitals.map(h => h.id);
-  const ratingsRaw = hospitalIds.length > 0
-    ? await prisma.review.groupBy({
-        by:    ["hospitalId"],
-        where: { hospitalId: { in: hospitalIds } },
-        _avg:  { rating: true },
-        _count: { rating: true },
-      })
-    : [];
-
+  // Start with zero ratings for all hospitals; populate if the Review table exists
   const ratingMap: Record<string, { avg: number; count: number }> = {};
-  for (const r of ratingsRaw) {
-    if (r.hospitalId) ratingMap[r.hospitalId] = { avg: r._avg.rating ?? 0, count: r._count.rating };
+  try {
+    const hospitalIds = hospitals.map(h => h.id);
+    if (hospitalIds.length > 0) {
+      const ratingsRaw = await prisma.review.groupBy({
+        by:     ["hospitalId"],
+        where:  { hospitalId: { in: hospitalIds } },
+        _avg:   { rating: true },
+        _count: { rating: true },
+      });
+      for (const r of ratingsRaw) {
+        if (r.hospitalId) ratingMap[r.hospitalId] = { avg: r._avg.rating ?? 0, count: r._count.rating };
+      }
+    }
+  } catch {
+    // Review table not yet migrated — return hospitals without ratings
   }
 
   let result = hospitals.map(h => ({
