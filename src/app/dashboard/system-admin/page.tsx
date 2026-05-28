@@ -283,8 +283,11 @@ export default function SystemAdminDashboard() {
                   {/* Header row */}
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={ORDER_STATUS_BADGES[o.status]}>{o.status.replace("_", " ")}</span>
+                        {o.payment?.razorpayOrderId?.startsWith("COD_") && (
+                          <span className="badge bg-amber-100 text-amber-700">💵 COD</span>
+                        )}
                         <span className="text-xs text-slate-400">{new Date(o.createdAt).toDateString()}</span>
                       </div>
                       <p className="font-semibold text-slate-800">{o.patient?.user?.name}</p>
@@ -343,8 +346,11 @@ export default function SystemAdminDashboard() {
                   <p className="text-sm font-semibold text-slate-600">Ready to Dispatch ({paid.length})</p>
                   {paid.map(o => (
                     <div key={o.id} className="card">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className={ORDER_STATUS_BADGES[o.status]}>{o.status.replace(/_/g, " ")}</span>
+                        {o.payment?.razorpayOrderId?.startsWith("COD_") && (
+                          <span className="badge bg-amber-100 text-amber-700">💵 Cash on Delivery</span>
+                        )}
                       </div>
                       <p className="font-semibold text-slate-800">{o.patient?.user?.name}</p>
                       <p className="text-xs text-slate-400">{o.patient?.user?.phone}</p>

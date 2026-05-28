@@ -27,12 +27,34 @@ interface Props {
 }
 
 export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }: Props) {
-  const [mode, setMode]           = useState<"full" | "emi">("full");
+  const [mode, setMode]           = useState<"full" | "emi" | "cod">("full");
   const [tenure, setTenure]       = useState<EmiTenure>(3);
   const [loading, setLoading]     = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const emi = calculateEmi(amount, tenure);
+
+  async function confirmCod() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/payments/cod", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ referenceId }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        onError?.(d.error ?? "Failed to confirm COD order");
+        return;
+      }
+      onSuccess?.();
+    } catch (err: any) {
+      onError?.(err.message ?? "COD confirmation error");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function pay(isEmi: boolean) {
     if (loading) return;
@@ -103,7 +125,7 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
   return (
     <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-4">
       {/* Mode selector */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setMode("full")}
           className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
@@ -112,7 +134,7 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
               : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
           }`}
         >
-          💳 Pay Full ₹{amount.toFixed(2)}
+          💳 Pay Online
         </button>
         <button
           onClick={() => setMode("emi")}
@@ -122,8 +144,20 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
               : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
           }`}
         >
-          📅 Pay in EMI
+          📅 EMI
         </button>
+        {type === "MEDICINE_ORDER" && (
+          <button
+            onClick={() => setMode("cod")}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              mode === "cod"
+                ? "bg-amber-500 text-white border-amber-500"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-amber-50"
+            }`}
+          >
+            💵 Cash on Delivery
+          </button>
+        )}
       </div>
 
       {/* T&C acceptance — required by Razorpay guidelines */}
@@ -153,7 +187,7 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
           disabled={loading || !termsAccepted}
           className="w-full btn-primary py-2.5 flex items-center justify-center gap-2"
         >
-          {loading ? "Processing…" : `💳 Pay ₹${amount.toFixed(2)} Now`}
+          {loading ? "Processing…" : `💳 Pay ₹${amount.toFixed(2)} Online`}
         </button>
       )}
 
@@ -209,6 +243,27 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
             className="w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
           >
             {loading ? "Processing…" : `📅 Pay 1st Instalment ₹${emi.monthlyEmi.toFixed(2)}`}
+          </button>
+        </div>
+      )}
+      {mode === "cod" && (
+        <div className="space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 space-y-1">
+            <p className="font-semibold">💵 Cash on Delivery</p>
+            <p>Pay <strong>₹{amount.toFixed(2)}</strong> in cash when your order arrives at your door.</p>
+            <ul className="text-xs text-amber-700 list-disc list-inside space-y-0.5 pt-1">
+              <li>Keep exact change ready</li>
+              <li>You will receive a 6-digit OTP — share it with the delivery person to confirm receipt</li>
+              <li>COD available for orders up to ₹5,000</li>
+            </ul>
+          </div>
+
+          <button
+            onClick={confirmCod}
+            disabled={loading || !termsAccepted}
+            className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {loading ? "Confirming…" : `💵 Confirm COD — ₹${amount.toFixed(2)}`}
           </button>
         </div>
       )}
