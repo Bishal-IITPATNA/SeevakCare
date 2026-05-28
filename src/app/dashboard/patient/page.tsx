@@ -51,6 +51,8 @@ export default function PatientDashboard() {
   const [selectedService, setSelectedService]   = useState<any>(null);
   const [hTcAccepted, setHTcAccepted]     = useState(false);
   const [hBookingStep, setHBookingStep]   = useState<"services" | "form">("services");
+  const [activeCategory, setActiveCategory]     = useState<string>("All");
+  const [activeSubcategory, setActiveSubcategory] = useState<string>("All");
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
@@ -136,6 +138,8 @@ export default function PatientDashboard() {
     setHTcAccepted(false);
     setHBookingStep("services");
     setHServices([]);
+    setActiveCategory("All");
+    setActiveSubcategory("All");
     setHServicesLoading(true);
     try {
       const res = await fetch(`/api/hospitals/${h.id}/services`);
@@ -483,9 +487,80 @@ export default function PatientDashboard() {
                         </div>
                       )}
 
+                      {/* Category tabs */}
+                      {!hServicesLoading && hServices.length > 0 && (() => {
+                        const categories = ["All", ...Array.from(new Set(hServices.map((s: any) => s.category)))];
+                        const inCategory = activeCategory === "All" ? hServices : hServices.filter((s: any) => s.category === activeCategory);
+                        const subcategories = ["All", ...Array.from(new Set(inCategory.map((s: any) => s.subcategory).filter(Boolean)))];
+                        const visibleServices = inCategory.filter((s: any) =>
+                          activeSubcategory === "All" || s.subcategory === activeSubcategory
+                        );
+                        return (
+                          <>
+                            {/* Category pills */}
+                            <div className="flex flex-wrap gap-2">
+                              {categories.map(cat => (
+                                <button
+                                  key={cat}
+                                  onClick={() => { setActiveCategory(cat); setActiveSubcategory("All"); setSelectedService(null); setHTcAccepted(false); }}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                                    activeCategory === cat
+                                      ? "bg-sky-600 text-white border-sky-600"
+                                      : "bg-white text-slate-600 border-slate-200 hover:bg-sky-50"
+                                  }`}
+                                >
+                                  {cat}
+                                  {cat !== "All" && (
+                                    <span className="ml-1 opacity-70">
+                                      ({hServices.filter((s: any) => s.category === cat).length})
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Subcategory pills — only if subcategories exist in this category */}
+                            {subcategories.length > 1 && (
+                              <div className="flex flex-wrap gap-2 pl-1 border-l-2 border-sky-200">
+                                <span className="text-xs text-slate-400 self-center">Sub-category:</span>
+                                {subcategories.map(sub => (
+                                  <button
+                                    key={sub}
+                                    onClick={() => { setActiveSubcategory(sub); setSelectedService(null); setHTcAccepted(false); }}
+                                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                                      activeSubcategory === sub
+                                        ? "bg-violet-600 text-white border-violet-600"
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"
+                                    }`}
+                                  >
+                                    {sub}
+                                    {sub !== "All" && (
+                                      <span className="ml-1 opacity-70">
+                                        ({inCategory.filter((s: any) => s.subcategory === sub).length})
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Result count */}
+                            <p className="text-xs text-slate-400">
+                              Showing {visibleServices.length} service{visibleServices.length !== 1 ? "s" : ""}
+                              {activeCategory !== "All" ? ` in ${activeCategory}` : ""}
+                              {activeSubcategory !== "All" ? ` › ${activeSubcategory}` : ""}
+                            </p>
+                          </>
+                        );
+                      })()}
+
                       {/* Service cards */}
                       <div className="grid gap-3">
-                        {hServices.map((svc: any) => {
+                        {(activeCategory === "All"
+                            ? hServices
+                            : hServices.filter((s: any) => s.category === activeCategory)
+                          ).filter((s: any) => activeSubcategory === "All" || s.subcategory === activeSubcategory)
+                          .map((svc: any) => {
                           const isSelected = selectedService?.id === svc.id;
                           const includes = svc.includes ? svc.includes.split("|").filter(Boolean) : [];
                           const excludes = svc.excludes ? svc.excludes.split("|").filter(Boolean) : [];
@@ -503,6 +578,9 @@ export default function PatientDashboard() {
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-slate-800">{svc.name}</span>
                                     <span className="badge bg-slate-100 text-slate-500 text-xs">{svc.category}</span>
+                                    {svc.subcategory && (
+                                      <span className="badge bg-violet-50 text-violet-600 text-xs">{svc.subcategory}</span>
+                                    )}
                                     {svc.department && (
                                       <span className="badge bg-sky-50 text-sky-600 text-xs">{svc.department.name}</span>
                                     )}

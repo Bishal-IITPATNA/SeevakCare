@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const {
-    name, description, category, price, gstPercent,
+    name, description, category, subcategory, price, gstPercent,
     departmentId, admissionDays,
     includes, excludes,
     preOpInstructions, postOpInstructions,
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       name,
       description:        description        ?? null,
       category,
+      subcategory:        subcategory        ?? "",
       price:              Number(price),
       gstPercent:         gstPercent != null  ? Number(gstPercent) : 0,
       admissionDays:      admissionDays != null ? Number(admissionDays) : 0,

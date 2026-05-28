@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json();
   const {
-    name, description, category, price, gstPercent,
+    name, description, category, subcategory, price, gstPercent,
     departmentId, admissionDays, isActive,
     includes, excludes,
     preOpInstructions, postOpInstructions,
@@ -33,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       name:               name               ?? undefined,
       description:        description        ?? undefined,
       category:           category           ?? undefined,
+      subcategory:        subcategory        ?? undefined,
       price:              price != null       ? Number(price)       : undefined,
       gstPercent:         gstPercent != null  ? Number(gstPercent)  : undefined,
       departmentId:       "departmentId" in body ? (departmentId || null) : undefined,

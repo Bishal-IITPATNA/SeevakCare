@@ -39,6 +39,18 @@ function ServiceForm({ form, setForm, departments, msg, onSubmit, submitLabel, c
             {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+        {/* Subcategory */}
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            Sub-category <span className="text-slate-400">(optional — e.g. Kidney Stone, Cataract, Baby Delivery)</span>
+          </label>
+          <input
+            placeholder="Enter sub-category to group similar services…"
+            value={form.subcategory ?? ""}
+            onChange={e => setForm((f: any) => ({ ...f, subcategory: e.target.value }))}
+            className="input"
+          />
+        </div>
         {/* Row 2 */}
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Package Price (₹) *</label>
@@ -130,7 +142,7 @@ const NAV = [
 const SERVICE_CATEGORIES = ["Surgery", "Diagnostics", "Consultation", "Therapy", "Emergency", "Maternity", "Rehabilitation", "Other"];
 
 const BLANK_SERVICE = {
-  name: "", description: "", category: "Surgery", departmentId: "",
+  name: "", description: "", category: "Surgery", subcategory: "", departmentId: "",
   price: "", gstPercent: "0", admissionDays: "1",
   includes: "Room charges (General ward)\nNursing care\nSurgeon fee\nAnesthesia fee\nOperation theater charges\nBasic medications (as per protocol)\nPre-operative investigations\nPost-operative dressings",
   excludes: "ICU charges (if required)\nBlood and blood products\nImplants and prosthetics\nSpecialized investigations\nPrivate room upgrade\nPersonal care items",
@@ -673,7 +685,7 @@ export default function HospitalAdminDashboard() {
                             </div>
                             <div className="flex flex-col gap-1.5 shrink-0 items-end">
                               <div className="flex gap-1.5">
-                                <button onClick={() => { setEditSvc(svc); setEditSvcForm({ name: svc.name, description: svc.description ?? "", category: svc.category, departmentId: svc.departmentId ?? "", price: svc.price.toString(), gstPercent: svc.gstPercent.toString(), admissionDays: svc.admissionDays.toString(), includes: svc.includes, excludes: svc.excludes, preOpInstructions: svc.preOpInstructions ?? "", postOpInstructions: svc.postOpInstructions ?? "", paymentTerms: svc.paymentTerms ?? "", cancellationPolicy: svc.cancellationPolicy ?? "", additionalTerms: svc.additionalTerms ?? "" }); setEditSvcMsg(""); setExpandedSvc(null); }} className="btn-secondary text-xs">✏️ Edit</button>
+                                <button onClick={() => { setEditSvc(svc); setEditSvcForm({ name: svc.name, description: svc.description ?? "", category: svc.category, subcategory: svc.subcategory ?? "", departmentId: svc.departmentId ?? "", price: svc.price.toString(), gstPercent: svc.gstPercent.toString(), admissionDays: svc.admissionDays.toString(), includes: svc.includes, excludes: svc.excludes, preOpInstructions: svc.preOpInstructions ?? "", postOpInstructions: svc.postOpInstructions ?? "", paymentTerms: svc.paymentTerms ?? "", cancellationPolicy: svc.cancellationPolicy ?? "", additionalTerms: svc.additionalTerms ?? "" }); setEditSvcMsg(""); setExpandedSvc(null); }} className="btn-secondary text-xs">✏️ Edit</button>
                                 <button onClick={() => deleteService(svc.id)} className="text-xs text-red-400 hover:text-red-600 border border-red-200 px-2 py-1 rounded-lg">Delete</button>
                               </div>
                               <button onClick={() => toggleSvcActive(svc)} className={`text-xs px-2 py-1 rounded-lg border ${svc.isActive ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}>

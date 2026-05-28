@@ -529,6 +529,7 @@ model HospitalService {
   name               String
   description        String?
   category           String   // "Surgery" | "Diagnostics" | "Consultation" | "Therapy" | "Emergency" | "Maternity" | "Other"
+  subcategory        String   @default("") // e.g. "Kidney Stone", "Cataract", "Bone Fracture"
   price              Decimal  @db.Decimal(10, 2)
   gstPercent         Decimal  @default(0) @db.Decimal(5, 2)
   // Admission / stay details
