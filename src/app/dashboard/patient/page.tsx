@@ -37,13 +37,20 @@ export default function PatientDashboard() {
   const [profileMsg, setProfileMsg]   = useState("");
 
   // Hospital search state
-  const [hospitals, setHospitals]     = useState<any[]>([]);
+  const [hospitals, setHospitals]         = useState<any[]>([]);
   const [hospitalQuery, setHospitalQuery] = useState("");
   const [hospitalCity, setHospitalCity]   = useState("");
   const [hospitalSearching, setHospitalSearching] = useState(false);
   const [selectedHospital, setSelectedHospital]   = useState<any>(null);
-  const [hBooking, setHBooking]       = useState({ departmentId: "", appointmentDate: "", slotTime: "", reason: "" });
-  const [hBookingMsg, setHBookingMsg] = useState("");
+  const [hBooking, setHBooking]           = useState({ departmentId: "", appointmentDate: "", slotTime: "", reason: "" });
+  const [hBookingMsg, setHBookingMsg]     = useState("");
+
+  // Hospital services + T&C state
+  const [hServices, setHServices]         = useState<any[]>([]);
+  const [hServicesLoading, setHServicesLoading] = useState(false);
+  const [selectedService, setSelectedService]   = useState<any>(null);
+  const [hTcAccepted, setHTcAccepted]     = useState(false);
+  const [hBookingStep, setHBookingStep]   = useState<"services" | "form">("services");
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
@@ -120,6 +127,23 @@ export default function PatientDashboard() {
     const data = await res.json();
     setHospitals(Array.isArray(data) ? data : []);
     setHospitalSearching(false);
+  }
+
+  async function selectHospital(h: any) {
+    setSelectedHospital(h);
+    setHBookingMsg("");
+    setSelectedService(null);
+    setHTcAccepted(false);
+    setHBookingStep("services");
+    setHServices([]);
+    setHServicesLoading(true);
+    try {
+      const res = await fetch(`/api/hospitals/${h.id}/services`);
+      const data = await res.json();
+      setHServices(Array.isArray(data) ? data : []);
+    } finally {
+      setHServicesLoading(false);
+    }
   }
 
   async function bookHospitalAppointment() {
@@ -410,7 +434,7 @@ export default function PatientDashboard() {
                             <p className="text-sm text-slate-500">{h.address}, {h.city}</p>
                             <p className="text-xs text-slate-400 mt-0.5">{h.phone} · {h.email}</p>
                           </div>
-                          <button onClick={() => { setSelectedHospital(h); setHBookingMsg(""); }} className="btn-primary text-xs whitespace-nowrap">
+                          <button onClick={() => selectHospital(h)} className="btn-primary text-xs whitespace-nowrap">
                             Book →
                           </button>
                         </div>
@@ -426,58 +450,259 @@ export default function PatientDashboard() {
                   </div>
                 </>
               ) : (
-                <div className="card max-w-md">
-                  <div className="flex items-center gap-2 mb-4">
-                    <button onClick={() => setSelectedHospital(null)} className="text-slate-400 hover:text-slate-600 text-sm">← Back</button>
-                    <h3 className="font-bold text-slate-800">{selectedHospital.name}</h3>
+                <div className="max-w-2xl space-y-4">
+                  {/* Hospital header */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setSelectedHospital(null); setSelectedService(null); setHTcAccepted(false); }}
+                      className="text-slate-400 hover:text-slate-600 text-sm"
+                    >← Back</button>
+                    <div>
+                      <h3 className="font-bold text-slate-800">{selectedHospital.name}</h3>
+                      <p className="text-xs text-slate-400">{selectedHospital.address}, {selectedHospital.city}</p>
+                    </div>
                   </div>
 
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Department *</label>
-                  <select
-                    value={hBooking.departmentId}
-                    onChange={e => setHBooking(b => ({ ...b, departmentId: e.target.value }))}
-                    className="input mb-3"
-                  >
-                    <option value="">Select department…</option>
-                    {selectedHospital.departments?.map((d: any) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  {/* Step 1: Services + Pricing + T&C */}
+                  {hBookingStep === "services" && (
+                    <>
+                      <p className="text-sm text-slate-500 font-medium">
+                        Select a service to view pricing and terms before booking.
+                      </p>
 
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-                  <input
-                    type="date"
-                    min={new Date().toISOString().slice(0, 10)}
-                    value={hBooking.appointmentDate}
-                    onChange={e => setHBooking(b => ({ ...b, appointmentDate: e.target.value }))}
-                    className="input mb-3"
-                  />
+                      {hServicesLoading && <p className="text-slate-400 text-sm">Loading services…</p>}
 
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Time Slot *</label>
-                  <input
-                    type="time"
-                    value={hBooking.slotTime}
-                    onChange={e => setHBooking(b => ({ ...b, slotTime: e.target.value }))}
-                    className="input mb-3"
-                  />
+                      {!hServicesLoading && hServices.length === 0 && (
+                        <div className="card bg-sky-50 border-sky-200">
+                          <p className="text-sm text-sky-700 font-medium">No specific services listed.</p>
+                          <p className="text-xs text-sky-600 mt-1">You can still book an appointment — pricing will be confirmed at the hospital.</p>
+                          <button
+                            onClick={() => { setSelectedService(null); setHBookingStep("form"); }}
+                            className="btn-primary text-sm mt-3"
+                          >Continue to Booking →</button>
+                        </div>
+                      )}
 
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Visit</label>
-                  <input
-                    placeholder="Brief description…"
-                    value={hBooking.reason}
-                    onChange={e => setHBooking(b => ({ ...b, reason: e.target.value }))}
-                    className="input mb-4"
-                  />
+                      {/* Service cards */}
+                      <div className="grid gap-3">
+                        {hServices.map((svc: any) => {
+                          const isSelected = selectedService?.id === svc.id;
+                          const includes = svc.includes ? svc.includes.split("|").filter(Boolean) : [];
+                          const excludes = svc.excludes ? svc.excludes.split("|").filter(Boolean) : [];
+                          return (
+                            <div
+                              key={svc.id}
+                              onClick={() => { setSelectedService(isSelected ? null : svc); setHTcAccepted(false); }}
+                              className={`card cursor-pointer transition-all border-2 ${
+                                isSelected ? "border-sky-500 bg-sky-50" : "border-transparent hover:border-slate-200"
+                              }`}
+                            >
+                              {/* Service header */}
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold text-slate-800">{svc.name}</span>
+                                    <span className="badge bg-slate-100 text-slate-500 text-xs">{svc.category}</span>
+                                    {svc.department && (
+                                      <span className="badge bg-sky-50 text-sky-600 text-xs">{svc.department.name}</span>
+                                    )}
+                                    {svc.admissionDays > 0 && (
+                                      <span className="badge bg-purple-50 text-purple-600 text-xs">{svc.admissionDays}d admission</span>
+                                    )}
+                                  </div>
+                                  {svc.description && (
+                                    <p className="text-xs text-slate-500 mt-1">{svc.description}</p>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-lg font-bold text-sky-700">₹{Number(svc.price).toLocaleString("en-IN")}</p>
+                                  {Number(svc.gstPercent) > 0 && (
+                                    <p className="text-xs text-slate-400">+{svc.gstPercent}% GST</p>
+                                  )}
+                                </div>
+                              </div>
 
-                  {hBookingMsg && (
-                    <p className={`text-sm mb-3 ${hBookingMsg.includes("booked") ? "text-green-600" : "text-red-500"}`}>
-                      {hBookingMsg}
-                    </p>
+                              {/* Expanded T&C on selection */}
+                              {isSelected && (
+                                <div className="mt-4 space-y-3 border-t border-sky-200 pt-4">
+
+                                  {/* Includes / Excludes */}
+                                  {(includes.length > 0 || excludes.length > 0) && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      {includes.length > 0 && (
+                                        <div className="bg-green-50 rounded-lg p-3">
+                                          <p className="text-xs font-semibold text-green-700 mb-1.5">✅ What&apos;s Included</p>
+                                          <ul className="space-y-0.5">
+                                            {includes.map((item: string, i: number) => (
+                                              <li key={i} className="text-xs text-green-800">• {item}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                      {excludes.length > 0 && (
+                                        <div className="bg-red-50 rounded-lg p-3">
+                                          <p className="text-xs font-semibold text-red-700 mb-1.5">❌ What&apos;s Excluded</p>
+                                          <ul className="space-y-0.5">
+                                            {excludes.map((item: string, i: number) => (
+                                              <li key={i} className="text-xs text-red-800">• {item}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Pre/Post op instructions */}
+                                  {svc.preOpInstructions && (
+                                    <div className="bg-amber-50 rounded-lg p-3">
+                                      <p className="text-xs font-semibold text-amber-700 mb-1">📋 Pre-procedure Instructions</p>
+                                      <p className="text-xs text-amber-800">{svc.preOpInstructions}</p>
+                                    </div>
+                                  )}
+                                  {svc.postOpInstructions && (
+                                    <div className="bg-blue-50 rounded-lg p-3">
+                                      <p className="text-xs font-semibold text-blue-700 mb-1">🏥 Post-procedure Care</p>
+                                      <p className="text-xs text-blue-800">{svc.postOpInstructions}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Payment terms */}
+                                  {svc.paymentTerms && (
+                                    <div className="bg-slate-50 rounded-lg p-3">
+                                      <p className="text-xs font-semibold text-slate-600 mb-1">💳 Payment Terms</p>
+                                      <p className="text-xs text-slate-700">{svc.paymentTerms}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Cancellation policy */}
+                                  {svc.cancellationPolicy && (
+                                    <div className="bg-orange-50 rounded-lg p-3">
+                                      <p className="text-xs font-semibold text-orange-700 mb-1">🚫 Cancellation Policy</p>
+                                      <p className="text-xs text-orange-800">{svc.cancellationPolicy}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Additional terms */}
+                                  {svc.additionalTerms && (
+                                    <div className="bg-slate-50 rounded-lg p-3">
+                                      <p className="text-xs font-semibold text-slate-600 mb-1">📄 Additional Terms</p>
+                                      <p className="text-xs text-slate-700">{svc.additionalTerms}</p>
+                                    </div>
+                                  )}
+
+                                  {/* T&C acceptance */}
+                                  <label className="flex items-start gap-2 cursor-pointer bg-white rounded-lg border border-sky-200 p-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={hTcAccepted}
+                                      onChange={e => setHTcAccepted(e.target.checked)}
+                                      onClick={e => e.stopPropagation()}
+                                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 shrink-0"
+                                    />
+                                    <span className="text-xs text-slate-600 leading-relaxed">
+                                      I have read and agree to the pricing (₹{Number(svc.price).toLocaleString("en-IN")}
+                                      {Number(svc.gstPercent) > 0 ? ` + ${svc.gstPercent}% GST` : ""}),
+                                      includes/excludes, and all terms &amp; conditions listed above for <strong>{svc.name}</strong> at <strong>{selectedHospital.name}</strong>.
+                                    </span>
+                                  </label>
+
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setHBookingStep("form"); }}
+                                    disabled={!hTcAccepted}
+                                    className="w-full btn-primary py-2.5 disabled:opacity-50"
+                                  >
+                                    Continue to Book Appointment →
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
 
-                  <button onClick={bookHospitalAppointment} disabled={hBookingSubmitting} className="btn-primary w-full py-3">
-                    {hBookingSubmitting ? "Booking…" : "Confirm Booking →"}
-                  </button>
+                  {/* Step 2: Booking form */}
+                  {hBookingStep === "form" && (
+                    <div className="card max-w-md">
+                      <div className="flex items-center gap-2 mb-4">
+                        <button
+                          onClick={() => setHBookingStep("services")}
+                          className="text-slate-400 hover:text-slate-600 text-sm"
+                        >← Back to Services</button>
+                      </div>
+
+                      {/* Selected service summary */}
+                      {selectedService && (
+                        <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 mb-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-sm font-semibold text-sky-800">{selectedService.name}</p>
+                              <p className="text-xs text-sky-600">{selectedService.category}</p>
+                            </div>
+                            <p className="text-sm font-bold text-sky-700">
+                              ₹{Number(selectedService.price).toLocaleString("en-IN")}
+                              {Number(selectedService.gstPercent) > 0 && (
+                                <span className="text-xs font-normal"> +GST</span>
+                              )}
+                            </p>
+                          </div>
+                          <p className="text-xs text-sky-500 mt-1">✅ Terms &amp; conditions accepted</p>
+                        </div>
+                      )}
+
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Department *</label>
+                      <select
+                        value={hBooking.departmentId}
+                        onChange={e => setHBooking(b => ({ ...b, departmentId: e.target.value }))}
+                        className="input mb-3"
+                      >
+                        <option value="">Select department…</option>
+                        {selectedHospital.departments?.map((d: any) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().slice(0, 10)}
+                        value={hBooking.appointmentDate}
+                        onChange={e => setHBooking(b => ({ ...b, appointmentDate: e.target.value }))}
+                        className="input mb-3"
+                      />
+
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Time Slot *</label>
+                      <input
+                        type="time"
+                        value={hBooking.slotTime}
+                        onChange={e => setHBooking(b => ({ ...b, slotTime: e.target.value }))}
+                        className="input mb-3"
+                      />
+
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Visit</label>
+                      <input
+                        placeholder="Brief description…"
+                        value={hBooking.reason}
+                        onChange={e => setHBooking(b => ({ ...b, reason: e.target.value }))}
+                        className="input mb-4"
+                      />
+
+                      {hBookingMsg && (
+                        <p className={`text-sm mb-3 ${hBookingMsg.includes("booked") ? "text-green-600" : "text-red-500"}`}>
+                          {hBookingMsg}
+                        </p>
+                      )}
+
+                      <button
+                        onClick={bookHospitalAppointment}
+                        disabled={hBookingSubmitting}
+                        className="btn-primary w-full py-3"
+                      >
+                        {hBookingSubmitting ? "Booking…" : "Confirm Booking →"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
