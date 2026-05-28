@@ -16,13 +16,17 @@ export async function GET(req: NextRequest) {
   const hospitalId = await getAdminHospitalId(user.id);
   if (!hospitalId) return NextResponse.json({ error: "Hospital not found" }, { status: 404 });
 
-  const services = await prisma.hospitalService.findMany({
-    where: { hospitalId },
-    include: { department: { select: { id: true, name: true } } },
-    orderBy: [{ category: "asc" }, { name: "asc" }],
-  });
-
-  return NextResponse.json(services);
+  try {
+    const services = await prisma.hospitalService.findMany({
+      where: { hospitalId },
+      include: { department: { select: { id: true, name: true } } },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+    });
+    return NextResponse.json(services);
+  } catch (err) {
+    console.error("[hospital-admin/services] DB error:", err);
+    return NextResponse.json({ error: "Failed to load services. Schema may be out of sync." }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
