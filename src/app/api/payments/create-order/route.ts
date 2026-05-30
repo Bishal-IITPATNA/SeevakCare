@@ -41,20 +41,36 @@ export async function POST(req: NextRequest) {
 
   if (amountINR <= 0) return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
 
-  // Idempotency guard: reject if a non-failed payment already exists for this reference
+  // Idempotency guard: block only if payment already succeeded.
+  // A PENDING record means the user opened the modal and cancelled — clean it up
+  // so they can retry without getting a stale-payment error.
   const existingPayment = await prisma.payment.findFirst({
     where: {
       ...(type === "MEDICINE_ORDER" ? { medicineOrderId: referenceId } : {}),
       ...(type === "LAB_BOOKING"    ? { labBookingId:    referenceId } : {}),
       ...(type === "APPOINTMENT"    ? { appointmentId:   referenceId } : {}),
-      status: { not: "FAILED" },
+      status: { notIn: ["FAILED"] },
     },
   });
-  if (existingPayment) {
+
+  if (existingPayment?.status === "SUCCESS") {
     return NextResponse.json(
-      { error: "A payment for this reference already exists." },
+      { error: "Payment already completed for this reference." },
       { status: 409 }
     );
+  }
+
+  if (existingPayment?.status === "PENDING") {
+    // Abandoned / cancelled payment — delete it (and any orphaned EMI plan) so the
+    // user can start a fresh checkout.
+    const emiPlan = await prisma.emiPlan.findUnique({
+      where: { paymentId: existingPayment.id },
+    });
+    if (emiPlan) {
+      await prisma.emiInstallment.deleteMany({ where: { emiPlanId: emiPlan.id } });
+      await prisma.emiPlan.delete({ where: { id: emiPlan.id } });
+    }
+    await prisma.payment.delete({ where: { id: existingPayment.id } });
   }
 
   if (isEmi) {
