@@ -83,8 +83,16 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         ? `Instalment 1/${tenure} — ₹${data.monthlyEmi?.toFixed(2)}`
         : `₹${amount.toFixed(2)}`;
 
-      // UPI-only config: shows QR code + PhonePe / GPay / Paytm intent buttons
-      const upiConfig = upiOnly
+      // On mobile, QR codes make no sense (can't scan your own screen).
+      // Let Razorpay's standard checkout handle mobile UPI natively — it
+      // automatically shows intent buttons for every installed UPI app.
+      // Only apply the custom QR config on desktop.
+      const isMobile =
+        /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        window.innerWidth < 768;
+
+      // UPI config for desktop: QR code + collect (enter UPI ID)
+      const upiConfig = upiOnly && !isMobile
         ? {
             config: {
               display: {
@@ -93,16 +101,16 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
                     name: "Pay via UPI",
                     instruments: [
                       { method: "upi", flows: ["qr"] },
-                      { method: "upi", flows: ["intent"], apps: ["google_pay", "phonepe", "paytm"] },
+                      { method: "upi", flows: ["collect"] }, // fallback: enter UPI ID
                     ],
                   },
                 },
                 sequence: ["block.upi_block"],
-                preferences: { show_default_blocks: false },
+                preferences: { show_default_blocks: true }, // keep card/netbanking as fallback
               },
             },
           }
-        : {};
+        : {}; // Mobile: Razorpay natively shows UPI intent (PhonePe, GPay, etc.)
 
       const rzp = new window.Razorpay({
         key:         data.key,
