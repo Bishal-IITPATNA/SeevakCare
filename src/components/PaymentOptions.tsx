@@ -83,16 +83,11 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
         ? `Instalment 1/${tenure} — ₹${data.monthlyEmi?.toFixed(2)}`
         : `₹${amount.toFixed(2)}`;
 
-      // On mobile, QR codes make no sense (can't scan your own screen).
-      // Let Razorpay's standard checkout handle mobile UPI natively — it
-      // automatically shows intent buttons for every installed UPI app.
-      // Only apply the custom QR config on desktop.
-      const isMobile =
-        /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        window.innerWidth < 768;
-
-      // UPI config for desktop: QR code + collect (enter UPI ID)
-      const upiConfig = upiOnly && !isMobile
+      // UPI config: show QR code + intent buttons + collect (enter UPI ID).
+      // QR works on all devices — the payer can screenshot and send it to
+      // another phone, or a nearby person can scan it.
+      // Razorpay also auto-shows intent buttons for installed UPI apps on mobile.
+      const upiConfig = upiOnly
         ? {
             config: {
               display: {
@@ -100,8 +95,9 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
                   upi_block: {
                     name: "Pay via UPI",
                     instruments: [
-                      { method: "upi", flows: ["qr"] },
-                      { method: "upi", flows: ["collect"] }, // fallback: enter UPI ID
+                      { method: "upi", flows: ["qr"] },      // QR code — scan with any device
+                      { method: "upi", flows: ["intent"] },  // installed UPI apps (mobile)
+                      { method: "upi", flows: ["collect"] }, // enter UPI ID manually
                     ],
                   },
                 },
@@ -110,7 +106,7 @@ export function PaymentOptions({ type, referenceId, amount, onSuccess, onError }
               },
             },
           }
-        : {}; // Mobile: Razorpay natively shows UPI intent (PhonePe, GPay, etc.)
+        : {};
 
       const rzp = new window.Razorpay({
         key:         data.key,
