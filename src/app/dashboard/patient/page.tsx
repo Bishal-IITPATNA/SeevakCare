@@ -436,7 +436,17 @@ export default function PatientDashboard() {
             </div>
           )}
 
-          {tab === "book-doctor" && <BookDoctor />}
+          {tab === "book-doctor" && (
+            <BookDoctor
+              onBooked={() => {
+                // Refresh appointments in background and switch to appointments tab
+                fetch("/api/appointments")
+                  .then(r => r.json())
+                  .then(d => setAppointments(Array.isArray(d) ? d : []));
+                setTab("appointments");
+              }}
+            />
+          )}
 
           {tab === "emi" && <EmiPlansSection />}
 

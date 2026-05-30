@@ -5,7 +5,13 @@ import { StarDisplay } from "./StarRating";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function BookDoctor() {
+interface BookDoctorProps {
+  /** Called after a booking is confirmed (or payment succeeds).
+   *  Parent should refresh the appointments list and switch to the appointments tab. */
+  onBooked?: () => void;
+}
+
+export function BookDoctor({ onBooked }: BookDoctorProps) {
   const [doctors, setDoctors]   = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [form, setForm]         = useState({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" });
@@ -26,11 +32,26 @@ export function BookDoctor() {
     return () => clearTimeout(t);
   }, [search, sortByRating]);
 
+  function resetForm() {
+    setBooked(null);
+    setSelected(null);
+    setForm({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" });
+    setError("");
+  }
+
+  function goToAppointments() {
+    resetForm();
+    onBooked?.();        // parent refreshes list + switches tab
+  }
+
   async function book() {
     if (!form.appointmentDate || !form.slotTime) {
       setError("Please select a date and time slot."); return;
     }
     setLoading(true); setError("");
+    // Pick the selected chamber's fee (not always chambers[0])
+    const selectedChamber = selected.chambers.find((c: any) => c.id === form.chamberId)
+      ?? selected.chambers[0];
     const res = await fetch("/api/appointments", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -40,40 +61,58 @@ export function BookDoctor() {
         appointmentDate: form.appointmentDate,
         slotTime:        form.slotTime,
         reason:          form.reason,
-        consultationFee: selected.chambers[0]?.consultationFee ?? 0,
+        consultationFee: selectedChamber?.consultationFee ?? 0,
       }),
     });
-    if (res.ok) { const d = await res.json(); setBooked(d); }
-    else { const d = await res.json(); setError(d.error ?? "Booking failed"); }
+    if (res.ok) {
+      const d = await res.json();
+      setBooked(d);
+      onBooked?.();   // immediately refresh appointments list in background
+    } else {
+      const d = await res.json();
+      setError(d.error ?? "Booking failed");
+    }
     setLoading(false);
   }
 
   if (booked) return (
-    <div className="card max-w-lg">
-      <div className="text-4xl mb-2">✅</div>
-      <h3 className="text-lg font-bold text-slate-800 mb-1">Appointment Requested!</h3>
+    <div className="card max-w-lg space-y-4">
+      <div className="text-4xl">✅</div>
+      <div>
+        <h3 className="text-lg font-bold text-slate-800">Appointment Requested!</h3>
+        <p className="text-sm text-slate-500 mt-1">
+          Your booking with <strong>{selected?.user?.name ?? "the doctor"}</strong> is saved and pending confirmation.
+        </p>
+      </div>
+
       {Number(booked.consultationFee ?? 0) > 0 ? (
         <>
-          <p className="text-slate-500 text-sm mb-4">
-            Pay the consultation fee of <strong>₹{Number(booked.consultationFee).toLocaleString("en-IN")}</strong> to confirm your slot.
-          </p>
+          <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 text-sm text-sky-800">
+            💳 Pay <strong>₹{Number(booked.consultationFee).toLocaleString("en-IN")}</strong> to confirm your slot, or pay later from <strong>My Appointments</strong>.
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
           <PaymentOptions
             type="APPOINTMENT"
             referenceId={booked.id}
             amount={Number(booked.consultationFee)}
-            onSuccess={() => { setBooked(null); setSelected(null); setForm({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" }); alert("Payment successful! Your appointment is confirmed."); }}
+            onSuccess={goToAppointments}
             onError={(msg) => setError(msg)}
           />
         </>
       ) : (
-        <p className="text-slate-500 text-sm mb-4">Your appointment request has been sent. You will be notified once the doctor accepts.</p>
+        <p className="text-slate-500 text-sm">
+          Your appointment request has been sent. You will be notified once the doctor confirms.
+        </p>
       )}
-      <button
-        onClick={() => { setBooked(null); setSelected(null); setForm({ chamberId: "", slotTime: "", appointmentDate: "", reason: "" }); }}
-        className="btn-secondary w-full mt-3"
-      >
-        Back to Doctor List
-      </button>
+
+      <div className="flex gap-2 pt-2">
+        <button onClick={goToAppointments} className="btn-primary flex-1">
+          View My Appointments →
+        </button>
+        <button onClick={resetForm} className="btn-secondary flex-1">
+          Book Another
+        </button>
+      </div>
     </div>
   );
 
