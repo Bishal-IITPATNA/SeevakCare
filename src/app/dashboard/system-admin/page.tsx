@@ -56,14 +56,40 @@ export default function SystemAdminDashboard() {
   const [billCreating, setBillCreating]       = useState<Record<string, boolean>>({});
   const [billMsg, setBillMsg]                 = useState<Record<string, string>>({});
 
+  // Payments
+  const [payments, setPayments]               = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentFilter, setPaymentFilter]     = useState<"ALL"|"SUCCESS"|"PENDING"|"FAILED">("ALL");
+
+  // ── Shared fetch helpers ──────────────────────────────────────
+  async function fetchOrders() {
+    const data = await fetch("/api/medicine-orders").then(r => r.json());
+    setOrders(Array.isArray(data) ? data : []);
+  }
+
+  async function fetchAnalytics() {
+    const data = await fetch("/api/admin/analytics").then(r => r.json());
+    setAnalytics(data);
+  }
+
+  async function fetchPayments() {
+    setPaymentsLoading(true);
+    try {
+      const data = await fetch("/api/admin/payments").then(r => r.json());
+      setPayments(Array.isArray(data) ? data : []);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
       if (!r.ok) { router.push("/login"); return null; }
       return r.json();
     }).then(u => { if (u) setUser(u); });
 
-    fetch("/api/admin/analytics").then(r => r.json()).then(setAnalytics);
-    fetch("/api/medicine-orders").then(r => r.json()).then(d => setOrders(Array.isArray(d) ? d : []));
+    fetchAnalytics();
+    fetchOrders();
     fetch("/api/medicines").then(r => r.json()).then(d => setMedicines(Array.isArray(d) ? d : []));
   }, [router]);
 
@@ -78,9 +104,13 @@ export default function SystemAdminDashboard() {
   }
 
   useEffect(() => {
-    if (tab === "prescriptions") fetchPrescUploads();
-    if (tab === "bookings")      fetchAdminBookings();
-    if (tab === "doctor-prescriptions") fetchAdminPrescs();
+    if (tab === "prescriptions")         fetchPrescUploads();
+    if (tab === "bookings")              fetchAdminBookings();
+    if (tab === "doctor-prescriptions")  fetchAdminPrescs();
+    if (tab === "payments")              fetchPayments();
+    // Refresh orders + analytics whenever the admin visits those tabs
+    if (tab === "overview")              fetchAnalytics();
+    if (tab === "approvals" || tab === "dispatch" || tab === "all-orders") fetchOrders();
   }, [tab]);
 
   function getOrderForm(id: string) {
@@ -269,7 +299,7 @@ export default function SystemAdminDashboard() {
 
   async function approveOrder(id: string) {
     await fetch(`/api/medicine-orders/${id}/approve`, { method: "POST" });
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: "PAYMENT_PENDING" } : o));
+    await fetchOrders(); // re-fetch from DB so payment status is always fresh
   }
 
   async function updateTracking(id: string, status: string) {
@@ -309,8 +339,11 @@ export default function SystemAdminDashboard() {
 
   const pendingHospitalAppts = adminAppts.filter(a => a.hospitalId && a.status === "PENDING");
 
+  const successPayments = payments.filter(p => p.status === "SUCCESS").length;
+
   const NAV = [
     { id: "overview",              label: "Overview",                                                   icon: "📊" },
+    { id: "payments",              label: `Payments${successPayments ? ` (${successPayments})` : ""}`, icon: "💳" },
     { id: "bookings",              label: `Bookings${pendingHospitalAppts.length ? ` (${pendingHospitalAppts.length})` : ""}`, icon: "📅" },
     { id: "approvals",             label: `Orders (${pendingApproval.length})`,                         icon: "✅" },
     { id: "dispatch",              label: `Dispatch (${paid.length + dispatched.length})`,               icon: "🚚" },
@@ -582,6 +615,9 @@ export default function SystemAdminDashboard() {
 
           {tab === "all-orders" && (
             <div className="overflow-x-auto">
+              <div className="flex justify-end mb-3">
+                <button onClick={fetchOrders} className="btn-secondary text-xs py-1.5 px-3">🔄 Refresh</button>
+              </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-100">
@@ -742,6 +778,138 @@ export default function SystemAdminDashboard() {
               })}
             </div>
           )}
+          {/* ── Payments Tab ─────────────────────────────────────────── */}
+          {tab === "payments" && (
+            <div className="space-y-4">
+              {/* Header + refresh */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
+                  {(["ALL", "SUCCESS", "PENDING", "FAILED"] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setPaymentFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        paymentFilter === f
+                          ? f === "SUCCESS" ? "bg-green-600 text-white border-green-600"
+                          : f === "FAILED"  ? "bg-red-500 text-white border-red-500"
+                          : f === "PENDING" ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-sky-600 text-white border-sky-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={fetchPayments}
+                  disabled={paymentsLoading}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                >
+                  {paymentsLoading ? "Refreshing…" : "🔄 Refresh"}
+                </button>
+              </div>
+
+              {paymentsLoading && <p className="text-sm text-slate-400">Loading payments…</p>}
+
+              {!paymentsLoading && (() => {
+                const filtered = payments.filter(p =>
+                  paymentFilter === "ALL" ? true : p.status === paymentFilter
+                );
+
+                if (filtered.length === 0) {
+                  return <p className="text-sm text-slate-400">No payments found.</p>;
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {/* Summary bar */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: "Successful",  color: "bg-green-50 text-green-700 border-green-100", status: "SUCCESS" },
+                        { label: "Pending",     color: "bg-amber-50 text-amber-700 border-amber-100",  status: "PENDING" },
+                        { label: "Failed",      color: "bg-red-50 text-red-600 border-red-100",        status: "FAILED"  },
+                      ].map(s => (
+                        <div key={s.status} className={`rounded-lg border p-3 text-center ${s.color}`}>
+                          <p className="text-xl font-bold">{payments.filter(p => p.status === s.status).length}</p>
+                          <p className="text-xs font-medium">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Payment cards */}
+                    {filtered.map(p => {
+                      const isCod    = p.razorpayOrderId?.startsWith("COD_");
+                      const isEmi    = !!p.emiPlan;
+                      const method   = isCod ? "COD" : isEmi ? `EMI (${p.emiPlan.tenureMonths}m)` : "Online";
+
+                      // Determine what this payment is for
+                      const patient  = p.appointment?.patient ?? p.medicineOrder?.patient ?? p.labBooking?.patient;
+                      let payFor = "—";
+                      if (p.appointment)   payFor = p.appointment.doctor ? `Doctor Appt — Dr. ${p.appointment.doctor?.user?.name ?? ""}` : `Hospital Appt — ${p.appointment.hospital?.name ?? ""}`;
+                      if (p.medicineOrder) payFor = "Medicine Order";
+                      if (p.labBooking)    payFor = `Lab — ${p.labBooking.labTest?.name ?? ""} @ ${p.labBooking.labStore?.name ?? ""}`;
+
+                      const statusColor: Record<string, string> = {
+                        SUCCESS: "bg-green-100 text-green-700",
+                        PENDING: "bg-amber-100 text-amber-700",
+                        FAILED:  "bg-red-100 text-red-600",
+                        REFUNDED:"bg-slate-100 text-slate-600",
+                      };
+
+                      return (
+                        <div key={p.id} className="card py-3">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="flex-1 min-w-0">
+                              {/* Status + method + date */}
+                              <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusColor[p.status] ?? "bg-slate-100 text-slate-600"}`}>
+                                  {p.status}
+                                </span>
+                                <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{method}</span>
+                                <span className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+
+                              {/* Patient */}
+                              <p className="font-semibold text-slate-800 truncate">{patient?.user?.name ?? "—"}</p>
+                              <p className="text-xs text-slate-400">{patient?.user?.email}{patient?.user?.phone ? ` · ${patient.user.phone}` : ""}</p>
+
+                              {/* What for */}
+                              <p className="text-xs text-sky-700 mt-0.5 font-medium">{payFor}</p>
+
+                              {/* EMI details */}
+                              {isEmi && (
+                                <p className="text-xs text-green-700 mt-0.5">
+                                  EMI: ₹{Number(p.emiPlan.monthlyEmi).toFixed(2)}/mo × {p.emiPlan.tenureMonths} · Total ₹{Number(p.emiPlan.totalPayable).toFixed(2)}
+                                </p>
+                              )}
+
+                              {/* Razorpay IDs */}
+                              <div className="mt-1.5 space-y-0.5">
+                                <p className="text-xs text-slate-400 font-mono truncate">Order: {p.razorpayOrderId}</p>
+                                {p.razorpayPaymentId && (
+                                  <p className="text-xs text-slate-400 font-mono truncate">Payment: {p.razorpayPaymentId}</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Amount */}
+                            <div className="text-right shrink-0">
+                              <p className={`text-lg font-bold ${p.status === "SUCCESS" ? "text-green-700" : p.status === "FAILED" ? "text-red-500" : "text-slate-700"}`}>
+                                ₹{Number(p.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-xs text-slate-400">INR</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* ── All Bookings Tab ─────────────────────────────────────── */}
           {tab === "bookings" && (
             <div className="space-y-8">
